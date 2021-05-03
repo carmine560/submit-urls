@@ -7,9 +7,20 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 
 ## Installation ##
 
-Make sure that Bash can find these scripts in the `PATH`.
+Make sure that Bash can find these scripts in the `$PATH`.  For
+example:
 
-### Requirements ###
+``` shell
+PATH=/path/to/submit-urls:$PATH
+```
+
+or
+
+``` shell
+cp -i *.sh ~/.local/bin
+```
+
+### Prerequisites ###
 
 These scripts use the following packages:
 
@@ -28,6 +39,16 @@ sudo apt install jq
 pip install yq
 sudo apt install gpg
 ```
+
+In the authorization, <!-- each script --> `submit-urls-bing.sh` uses
+an <!-- [ -->API key<!--
+](https://docs.microsoft.com/en-us/bingwebmaster/getting-access) -->
+for Bing, <!-- or --> `submit-urls-yandex.sh` uses an access token for
+Yandex.  <!-- Also, <\!-- their -\-> in --> In the encryption, <!-- of
+the --> <!-- configuration --> <!-- the script --> `configuration.sh`
+assumes that you have <!-- already generated --> your OpenPGP key pair
+and it is the first key <!-- found --> in the secret keyring.  <!--
+can specify yourself as the recipient. -->
 
 ## Usage ##
 
