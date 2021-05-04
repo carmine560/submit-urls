@@ -9,14 +9,15 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 
 ## Prerequisites ##
 
-These scripts use the following packages:
+These scripts have been tested on Debian bullseye on WSL 1 and use the
+following packages:
 
   - [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   - xq included in the [yq](https://kislyuk.github.io/yq/) package to
     transcode XML to JSON
   - [jq](https://stedolan.github.io/jq/) to filter JSON data
   - [GnuPG](https://gnupg.org/index.html) to encrypt the configuration
-    file <!-- that contains an API key or access token -->
+    file
 
 Install each package as needed.  For example:
 
@@ -71,9 +72,9 @@ submit-urls-yandex.sh
 ### Common Options ###
 
 The option `-n` is dry run; the script retrieves the sitemap and shows
-newer entries <!-- than the last submission --> but does not submit
-them.  The option `-s` is silent; the script does not show any output
-but still show an error message of curl.
+newer entries but does not submit them.  The option `-s` is silent;
+the script does not show any output but still show an error message of
+curl.
 
 ## License ##
 
