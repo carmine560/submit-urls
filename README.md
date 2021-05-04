@@ -77,7 +77,7 @@ submit-urls-yandex.sh
 ```
 
 ![Screenshot of GNOME Terminal where submit-urls-yandex.sh was
-executed.](https://dl.dropboxusercontent.com/s/sokhz20ulvdsg31/20210504T171646.png)
+executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.png)
 
 ### Common Options ###
 
