@@ -76,12 +76,22 @@ variables in the configuration file above.  Then:
 submit-urls-yandex.sh
 ```
 
+![Screenshot of GNOME Terminal where submit-urls-yandex.sh was
+executed.](https://dl.dropboxusercontent.com/s/sokhz20ulvdsg31/20210504T171646.png)
+
 ### Common Options ###
 
 The option `-n` is dry run; the script retrieves the sitemap and shows
 newer entries but does not submit them.  The option `-s` is silent;
 the script does not show any output but still show an error message
 from curl.
+
+## Known Issues ##
+
+`submit-urls-yandex.sh` repeats a request for each URL because the
+[queue
+method](https://yandex.com/dev/webmaster/doc/dg/reference/host-recrawl-post.html)
+of the API does not seem to support arrays.
 
 ## License ##
 
