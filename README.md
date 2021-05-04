@@ -1,26 +1,13 @@
 # submit-urls #
 
+<!-- Bash scripts that refer to sitemap and submit URLs of newer entries through Bing Webmaster or Yandex.Webmaster API -->
+
 Bash scripts that refer to the sitemap and submit the URLs of newer
 entries through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 [Yandex.Webmaster API](https://yandex.com/dev/webmaster/).
 
-## Installation ##
-
-Make sure that Bash can find these scripts in the `$PATH`.  For
-example:
-
-``` shell
-PATH=/path/to/submit-urls:$PATH
-```
-
-or
-
-``` shell
-cp -i *.sh ~/.local/bin
-```
-
-### Prerequisites ###
+## Prerequisites ##
 
 These scripts use the following packages:
 
@@ -33,36 +20,69 @@ These scripts use the following packages:
 
 Install each package as needed.  For example:
 
-```bash
+``` shell
 sudo apt install curl
-sudo apt install jq
 pip install yq
+sudo apt install jq
 sudo apt install gpg
 ```
 
-In the authorization, <!-- each script --> `submit-urls-bing.sh` uses
-an <!-- [ -->API key<!--
-](https://docs.microsoft.com/en-us/bingwebmaster/getting-access) -->
-for Bing, <!-- or --> `submit-urls-yandex.sh` uses an access token for
-Yandex.  <!-- Also, <\!-- their -\-> in --> In the encryption, <!-- of
-the --> <!-- configuration --> <!-- the script --> `configuration.sh`
-assumes that you have <!-- already generated --> your OpenPGP key pair
-and it is the first key <!-- found --> in the secret keyring.  <!--
-can specify yourself as the recipient. -->
+## Installation ##
+
+Make sure that Bash can find these scripts in the directories of the
+`PATH`.  For example:
+
+``` shell
+PATH=$HOME/path/to/submit-urls:$PATH
+```
+
+or
+
+``` shell
+cp -i *.sh ~/.local/bin
+```
 
 ## Usage ##
 
-Bing:
+If the <!-- default --> configuration file `~/.config/SCRIPT_NAME.gpg`
+does not exist when the following script is executed, the script <!--
+it --> will <!-- be created --> create and encrypt the file <!--
+encrypted --> <!-- using GnuPG. --> <!-- In the authorization, -->
+<!-- In the --> <!-- encryption, --> <!-- `configuration.sh` assumes
+that you have your OpenPGP key pair as the --> <!-- default key. -->
+<!-- `configuration.sh` --> <!-- Then the script --> <!-- assumes -->
+assuming that the default key of GnuPG is your OpenPGP key pair.  <!--
+and --> <!-- it is the first key in the secret keyring. --> <!-- Then
+you need to change the values of the --> <!-- variables in this
+file. -->
 
-```bash
+### Bing Webmaster ###
+
+<!-- `submit-urls-bing.sh` uses --> Prepare an API key for
+authorization, <!-- . --> <!-- Then you need to change --> and change
+the values of the variables in the configuration file above.  Then:
+
+``` shell
 submit-urls-bing.sh
 ```
 
-Yandex:
+### Yandex.Webmaster ###
 
-```bash
+<!-- `submit-urls-yandex.sh` uses --> Prepare an access token, user
+ID, and site ID for authorization and calling the API, and change the
+values of the variables in the configuration file above.  Then:
+
+``` shell
 submit-urls-yandex.sh
 ```
+
+### Common Options ###
+
+The option `-n` is dry run; the script retrieves the sitemap and shows
+newer entries than the last submission but does not submit them.  <!--
+perform a POST request. --> The option `-s` is <!-- work silently. -->
+silent; the script does not show <!-- entries and progress --> any
+output but still show an error message of curl.
 
 ## License ##
 
@@ -70,5 +90,7 @@ submit-urls-yandex.sh
 
 ## Links ##
 
-  - [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API &#8212; carmine blog](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
-  - [Bash Scripting to Submit Appropriate URLs through Yandex.Webmaster API &#8212; carmine blog](https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html)
+Blog posts for more details:
+
+  - [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
+  - [Bash Scripting to Submit Appropriate URLs through Yandex.Webmaster API](https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html)
