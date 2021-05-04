@@ -52,8 +52,10 @@ OpenPGP key pair.
 
 ### Bing Webmaster ###
 
-Prepare an API key for authorization, and change the values of the
-variables in the configuration file above.  Then:
+Prepare an [API
+key](https://docs.microsoft.com/en-us/bingwebmaster/getting-access)
+for authorization, and change the values of the variables in the
+configuration file above.  Then:
 
 ``` shell
 submit-urls-bing.sh
@@ -61,9 +63,14 @@ submit-urls-bing.sh
 
 ### Yandex.Webmaster ###
 
-Prepare an access token, user ID, and site ID for authorization and
-calling the API, and change the values of the variables in the
-configuration file above.  Then:
+Prepare an [access
+token](https://yandex.com/dev/oauth/doc/dg/tasks/get-oauth-token.html),
+[user
+ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
+[site
+ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
+authorization and calling the API, and change the values of the
+variables in the configuration file above.  Then:
 
 ``` shell
 submit-urls-yandex.sh
