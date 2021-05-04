@@ -3,8 +3,8 @@
 ## @file
 ## @brief Submit appropriate URLs through the Bing Webmaster API.
 ##
-## Incremental URL submission referring to the sitemap through the
-## Bing Webmaster API.  See the following post for more details:
+## Refer to the sitemap and submit the URLs of newer entries through
+## the Bing Webmaster API.  See the following post for more details:
 ## https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html
 
 . submit-urls-common.sh || exit

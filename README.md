@@ -3,7 +3,7 @@
 <!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster or Yandex.Webmaster API -->
 
 Bash scripts that refer to the sitemap and submit the URLs of newer
-entries than the last submission through the [Bing Webmaster
+entries through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 [Yandex.Webmaster API](https://yandex.com/dev/webmaster/).
 
@@ -82,9 +82,9 @@ executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.p
 ### Common Options ###
 
 The option `-n` is *dry run*; the script retrieves the sitemap and
-shows newer entries but does not submit them.  The option `-s` is
-*silent*; the script does not show any output except for an error
-message from curl.
+shows newer entries than the last submission but does not submit them.
+The option `-s` is *silent*; the script does not show any output
+except for an error message from curl.
 
 ## Known Issue ##
 
