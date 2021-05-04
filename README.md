@@ -73,8 +73,8 @@ submit-urls-yandex.sh
 
 The option `-n` is dry run; the script retrieves the sitemap and shows
 newer entries but does not submit them.  The option `-s` is silent;
-the script does not show any output but still show an error message of
-curl.
+the script does not show any output but still show an error message
+from curl.
 
 ## License ##
 
