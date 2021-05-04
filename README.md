@@ -67,7 +67,7 @@ Prepare an [access
 token](https://yandex.com/dev/oauth/doc/dg/tasks/get-oauth-token.html),
 [user
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
-[site
+[host
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
 authorization and using the API, and change the values of the
 variables in the configuration file above.  Then:
@@ -83,10 +83,10 @@ executed.](https://dl.dropboxusercontent.com/s/sokhz20ulvdsg31/20210504T171646.p
 
 The option `-n` is dry run; the script retrieves the sitemap and shows
 newer entries but does not submit them.  The option `-s` is silent;
-the script does not show any output but still show an error message
-from curl.
+the script does not show any output except for an error message from
+curl.
 
-## Known Issues ##
+## Known Issue ##
 
 `submit-urls-yandex.sh` repeats a request for each URL because the
 [queue
