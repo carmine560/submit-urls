@@ -81,10 +81,10 @@ executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.p
 
 ### Common Options ###
 
-The option `-n` is dry run; the script retrieves the sitemap and shows
-newer entries but does not submit them.  The option `-s` is silent;
-the script does not show any output except for an error message from
-curl.
+The option `-n` is *dry run*; the script retrieves the sitemap and
+shows newer entries but does not submit them.  The option `-s` is
+*silent*; the script does not show any output except for an error
+message from curl.
 
 ## Known Issue ##
 
