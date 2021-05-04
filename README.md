@@ -69,7 +69,7 @@ token](https://yandex.com/dev/oauth/doc/dg/tasks/get-oauth-token.html),
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
 [site
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
-authorization and calling the API, and change the values of the
+authorization and using the API, and change the values of the
 variables in the configuration file above.  Then:
 
 ``` shell
