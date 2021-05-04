@@ -51,7 +51,7 @@ EOF
 
 ## @fn cfg_set_encrypted_value()
 ## @brief Store the value of a variable in the encrypted
-## configuration.  Multiple pairs are allowed.
+## configuration.  Multiple pairs of parameters are allowed.
 ## @param $regex A regular expression for a variable.
 ## @param $replacement A replacement for the value.
 cfg_set_encrypted_value() {
