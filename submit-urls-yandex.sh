@@ -7,8 +7,11 @@
 ## the Yandex.Webmaster API.  See the following post for more details:
 ## https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html
 
-. submit-urls-common.sh || exit
-api_service=https://api.webmaster.yandex.net/v4/user
+. submit-urls-common.sh && suc_parse_parameters "$@" || exit
+if [ -z "$curl_silent_options" ]; then
+    curl_options=$curl_options' -w \n'
+fi
+readonly API_SERVICE=https://api.webmaster.yandex.net/v4/user
 
 default_configuration='sitemap=https://example.com/sitemap.xml
 access_token=ACCESS_TOKEN
@@ -16,11 +19,6 @@ user_id=USER_ID
 host_id=HOST_ID
 last_submitted=$(date -u +%FT%TZ)'
 . configuration.sh && cfg_initialize_encryption || exit
-
-suc_parse_parameters "$@" || exit
-if [ -z "$curl_silent_options" ]; then
-    curl_options=$curl_options' -w \n'
-fi
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.
@@ -33,7 +31,7 @@ newer_length=$(echo $newer_list | jq length) || exit
 # Request the remaining daily quota for URL submission.
 daily_quota=$(curl -H "Authorization: OAuth $access_token" \
                    -X GET $curl_options \
-                   $api_service/$user_id/hosts/$host_id/recrawl/quota |
+                   $API_SERVICE/$user_id/hosts/$host_id/recrawl/quota |
                   jq .quota_remainder) || exit
 
 # Add newer entries that you can submit to a URL list.
@@ -53,7 +51,7 @@ if [ "$dry_run" != true -a ! -z "$url_list" ]; then
         curl -d "{\"url\": $url}" -H "Authorization: OAuth $access_token" \
              -H 'Content-Type: application/json; charset=utf-8' \
              -X POST $curl_options $curl_silent_options \
-             $api_service/$user_id/hosts/$host_id/recrawl/queue || exit
+             $API_SERVICE/$user_id/hosts/$host_id/recrawl/queue || exit
     done
     cfg_set_encrypted_value last_submitted "$lastmod"
 fi
