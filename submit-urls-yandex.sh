@@ -16,9 +16,9 @@ user_id=USER_ID
 host_id=HOST_ID
 last_submitted=$(date -u +%FT%TZ)'
 . configuration.sh || exit
-cfg_initialize_encryption
+cfg_initialize_encryption || exit
 
-suc_parse_parameters "$@"
+suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then
     curl_options=$curl_options' -w \n'
 fi
@@ -38,9 +38,9 @@ daily_quota=$(curl -H "Authorization: OAuth $access_token" \
                   jq .quota_remainder) || exit
 
 # Add newer entries that you can submit to a URL list.
-suc_add_entries
+suc_add_entries || exit
 if [ "$silent" != true ]; then
-    suc_display_status
+    suc_display_status || exit
 fi
 
 # Submit the URL list and store the date of the last submitted entry.

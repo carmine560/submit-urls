@@ -15,9 +15,9 @@ site_url=https://example.com/
 api_key=API_KEY
 last_submitted=$(date -u +%FT%TZ)'
 . configuration.sh || exit
-cfg_initialize_encryption
+cfg_initialize_encryption || exit
 
-suc_parse_parameters "$@"
+suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then
     curl_options=$curl_options' -w \n'
 fi
@@ -37,9 +37,9 @@ read daily_quota monthly_quota \
               paste - -) || exit
 
 # Add newer entries that you can submit to a URL list.
-suc_add_entries
+suc_add_entries || exit
 if [ "$silent" != true ]; then
-    suc_display_status
+    suc_display_status || exit
 fi
 
 # Submit the URL list and store the date of the last submitted entry.
