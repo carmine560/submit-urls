@@ -66,7 +66,7 @@ cfg_set_encrypted_value() {
             else
                 sed_commands="$sed_commands; s/^(\s*${parameters[index]}=).*$/\1${parameters[++index]}/"
             fi
-            ((index++))
+            ((++index))
         done
         gpg -dq "$CONFIGURATION.gpg.bak" |
             sed -E "$sed_commands" |
