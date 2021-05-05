@@ -15,8 +15,7 @@ access_token=ACCESS_TOKEN
 user_id=USER_ID
 host_id=HOST_ID
 last_submitted=$(date -u +%FT%TZ)'
-. configuration.sh || exit
-cfg_initialize_encryption || exit
+. configuration.sh && cfg_initialize_encryption || exit
 
 suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then

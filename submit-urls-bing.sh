@@ -14,8 +14,7 @@ default_configuration='sitemap=https://example.com/sitemap.xml
 site_url=https://example.com/
 api_key=API_KEY
 last_submitted=$(date -u +%FT%TZ)'
-. configuration.sh || exit
-cfg_initialize_encryption || exit
+. configuration.sh && cfg_initialize_encryption || exit
 
 suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then
