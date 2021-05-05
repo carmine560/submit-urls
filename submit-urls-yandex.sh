@@ -13,11 +13,11 @@ if [ -z "$curl_silent_options" ]; then
 fi
 readonly API_SERVICE=https://api.webmaster.yandex.net/v4/user
 
-default_configuration='sitemap=https://example.com/sitemap.xml
+default_configuration="sitemap=https://example.com/sitemap.xml
 access_token=ACCESS_TOKEN
 user_id=USER_ID
 host_id=HOST_ID
-last_submitted=$(date -u +%FT%TZ)'
+last_submitted=$(date -u +%FT%TZ)"
 . configuration.sh && cfg_initialize_encryption || exit
 
 # Retrieve the sitemap and extract newer entries than the last

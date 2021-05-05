@@ -13,10 +13,10 @@ if [ -z "$curl_silent_options" ]; then
 fi
 readonly API_SERVICE=https://ssl.bing.com/webmaster/api.svc/json
 
-default_configuration='sitemap=https://example.com/sitemap.xml
+default_configuration="sitemap=https://example.com/sitemap.xml
 site_url=https://example.com/
 api_key=API_KEY
-last_submitted=$(date -u +%FT%TZ)'
+last_submitted=$(date -u +%FT%TZ)"
 . configuration.sh && cfg_initialize_encryption || exit
 
 # Retrieve the sitemap and extract newer entries than the last
