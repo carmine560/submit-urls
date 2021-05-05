@@ -12,11 +12,11 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 These scripts have been tested for Blogger on Debian bullseye on WSL 1
 and use the following packages:
 
-  - [curl](https://curl.se/) to retrieve the sitemap and submit URLs
-  - xq included in the [yq](https://kislyuk.github.io/yq/) package to
+  * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
+  * xq included in the [yq](https://kislyuk.github.io/yq/) package to
     transcode XML to JSON
-  - [jq](https://stedolan.github.io/jq/) to filter JSON data
-  - [GnuPG](https://gnupg.org/index.html) to encrypt the configuration
+  * [jq](https://stedolan.github.io/jq/) to filter JSON data
+  * [GnuPG](https://gnupg.org/index.html) to encrypt the configuration
     file
 
 Install each package as needed.  For example:
@@ -81,10 +81,10 @@ executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.p
 
 ### Common Options ###
 
-The option `-n` is *dry run*; the script retrieves the sitemap and
-shows newer entries than the last submission but does not submit them.
-The option `-s` is *silent*; the script does not show any output
-except for an error message from curl.
+  * `-n`: *dry run*; the script retrieves the sitemap and shows newer
+    entries than the last submission but does not submit them.
+  * `-s`: *silent*; the script does not show any output except for an
+    error message from curl.
 
 ## Known Issue ##
 
@@ -101,5 +101,5 @@ of the API does not seem to support arrays.
 
 Blog posts for more details:
 
-  - [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
-  - [Bash Scripting to Submit Appropriate URLs through Yandex.Webmaster API](https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html)
+  * [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
+  * [Bash Scripting to Submit Appropriate URLs through Yandex.Webmaster API](https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html)
