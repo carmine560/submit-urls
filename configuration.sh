@@ -1,5 +1,5 @@
 ## @file
-## @brief Variables and functions for the configuration file.
+## @brief Read and write the plain or encrypted configuration file.
 
 if [ -d "$HOME/.config" ]; then
     readonly CONFIGURATION=$HOME/.config/${0##*/}

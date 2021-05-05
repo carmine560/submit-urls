@@ -1,5 +1,5 @@
 ## @file
-## @brief Common variables and functions in URL submission scripts.
+## @brief Perform intermediate processing of URL submission.
 
 set -o pipefail
 curl_options=-fSs
