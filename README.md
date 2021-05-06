@@ -61,7 +61,7 @@ submit-urls-bing.sh
 ```
 
 ![Screenshot of GNOME Terminal where submit-urls-bing.sh was
-executed.](https://dl.dropboxusercontent.com/s/7xmecjp35o9595s/20210506T131216.png)
+executed.](https://dl.dropboxusercontent.com/s/uvdfl57t5jkhnc0/20210506T141204.png)
 
 ### Yandex.Webmaster ###
 
