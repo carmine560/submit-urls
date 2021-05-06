@@ -52,6 +52,6 @@ if [ "$dry_run" != true -a ! -z "$url_list" ]; then
              -H 'Content-Type: application/json; charset=utf-8' \
              -X POST $curl_options $curl_silent_options \
              $API_SERVICE/$user_id/hosts/$host_id/recrawl/queue || exit
+        cfg_set_encrypted_value last_submitted "$lastmod"
     done
-    cfg_set_encrypted_value last_submitted "$lastmod"
 fi
