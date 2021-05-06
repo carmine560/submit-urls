@@ -55,8 +55,7 @@ suc_add_entries() {
                 unsubmitted_list=$unsubmitted_list$DELIMITER$unsubmitted_loc
             fi
         fi
-        # If the value of the expression is non-zero, the return
-        # status is 0; otherwise the return status is 1.
+        # If the value of the expression is 0, the return status is 1.
         ((++index))
     done
 }
