@@ -60,6 +60,9 @@ configuration file above.  Then:
 submit-urls-bing.sh
 ```
 
+![Screenshot of GNOME Terminal where submit-urls-bing.sh was
+executed.](https://dl.dropboxusercontent.com/s/7xmecjp35o9595s/20210506T131216.png)
+
 ### Yandex.Webmaster ###
 
 Prepare an [access
@@ -80,10 +83,10 @@ executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.p
 
 ### Common Options ###
 
-  * `-n`: *dry run*; the script retrieves the sitemap and shows newer
-    entries than the last submission but does not submit them.
-  * `-s`: *silent*; the script does not show any output except for an
-    error message from curl.
+  * `-n`: *dry run*; retrieve the sitemap and show newer entries than
+    the last submission but do not submit them.
+  * `-s`: *silent*; do not show any output except for an error message
+    from curl.
 
 ## Known Issue ##
 
