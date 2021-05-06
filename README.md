@@ -46,15 +46,15 @@ cp -i *.sh ~/.local/bin
 ## Usage ##
 
 If the configuration file `~/.config/SCRIPT_NAME.gpg` does not exist,
-the following script will create and encrypt the file assuming that
-the default key of GnuPG is your OpenPGP key pair.
+the following script will create and encrypt it assuming that the
+default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
 Prepare an [API
 key](https://docs.microsoft.com/en-us/bingwebmaster/getting-access)
 for authorization, and replace the values of the following variables
-in the configuration file with your URLs and key:
+in the configuration file with yours:
 
   * `SITEMAP`
   * `SITE_URL`
@@ -78,8 +78,7 @@ ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
 [host
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
 authorization and using the API, and replace the values of the
-following variables in the configuration file with your URL, token,
-and IDs:
+following variables in the configuration file with yours:
 
   * `SITEMAP`
   * `access_token`
