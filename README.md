@@ -53,8 +53,14 @@ the default key of GnuPG is your OpenPGP key pair.
 
 Prepare an [API
 key](https://docs.microsoft.com/en-us/bingwebmaster/getting-access)
-for authorization, and change the values of the variables in the
-configuration file above.  Then:
+for authorization, and replace the values of the following variables
+in the configuration file with your URLs and key:
+
+  * `SITEMAP`
+  * `SITE_URL`
+  * `API_KEY`
+
+Then:
 
 ``` shell
 submit-urls-bing.sh
@@ -71,8 +77,16 @@ token](https://yandex.com/dev/oauth/doc/dg/tasks/get-oauth-token.html),
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
 [host
 ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
-authorization and using the API, and change the values of the
-variables in the configuration file above.  Then:
+authorization and using the API, and replace the values of the
+following variables in the configuration file with your URL, token,
+and IDs:
+
+  * `SITEMAP`
+  * `access_token`
+  * `USER_ID`
+  * `HOST_ID`
+
+Then:
 
 ``` shell
 submit-urls-yandex.sh
