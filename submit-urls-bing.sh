@@ -13,15 +13,15 @@ if [ -z "$curl_silent_options" ]; then
 fi
 readonly API_SERVICE=https://ssl.bing.com/webmaster/api.svc/json
 
-default_configuration="sitemap=https://example.com/sitemap.xml
-site_url=https://example.com/
-api_key=API_KEY
+default_configuration="readonly SITEMAP=https://example.com/sitemap.xml
+readonly SITE_URL=https://example.com/
+readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
 . configuration.sh && cfg_initialize_encryption || exit
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.
-newer_list=$(curl $curl_options "$sitemap" |
+newer_list=$(curl $curl_options "$SITEMAP" |
                  xq |
                  jq ".urlset.url[] | select(.lastmod > \"$last_submitted\")" |
                  jq -s 'sort_by(.lastmod)') || exit
@@ -29,7 +29,7 @@ newer_length=$(echo $newer_list | jq length) || exit
 
 # Request the remaining daily quota for URL submission.
 read daily_quota monthly_quota \
-     <<<$(curl -X GET $curl_options "$API_SERVICE/GetUrlSubmissionQuota?siteUrl=$site_url&apikey=$api_key" |
+     <<<$(curl -X GET $curl_options "$API_SERVICE/GetUrlSubmissionQuota?siteUrl=$SITE_URL&apikey=$API_KEY" |
               jq '.d | .DailyQuota, .MonthlyQuota' |
               paste - -) || exit
 
@@ -41,9 +41,9 @@ fi
 
 # Submit the URL list and store the date of the last submitted entry.
 if [ "$dry_run" != true -a ! -z "$url_list" ]; then
-    curl -d "{\"siteUrl\": \"$site_url\", \"urlList\": [${url_list//$DELIMITER/, }]}" \
+    curl -d "{\"siteUrl\": \"$SITE_URL\", \"urlList\": [${url_list//$DELIMITER/, }]}" \
          -H 'Content-Type: application/json; charset=utf-8' \
          -X POST $curl_options $curl_silent_options \
-         $API_SERVICE/SubmitUrlBatch?apikey=$api_key || exit
+         $API_SERVICE/SubmitUrlBatch?apikey=$API_KEY || exit
     cfg_set_encrypted_value last_submitted "$lastmod"
 fi
