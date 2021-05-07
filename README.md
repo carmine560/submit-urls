@@ -110,7 +110,7 @@ of the API does not seem to support arrays.
 
 ## License ##
 
-[MIT](LICENSE)
+[MIT](LICENSE.md)
 
 ## Links ##
 
