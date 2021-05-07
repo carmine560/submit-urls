@@ -73,6 +73,7 @@ cfg_set_encrypted_value() {
             gpg -e $GPG_OPTIONS -o "$CONFIGURATION.gpg" || exit
         rm "$CONFIGURATION.gpg.bak" || exit
     else
-        exit
+        echo Usage: ${FUNCNAME[0]} VARIABLE VALUE [VARIABLE VALUE ...] >&2
+        exit 2
     fi
 }
