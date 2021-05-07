@@ -2,9 +2,9 @@
 
 ## @file
 ## @brief Submit appropriate URLs through the Yandex.Webmaster API.
-##
-## Refer to the sitemap and submit the URLs of newer entries through
-## the Yandex.Webmaster API.  See the following post for more details:
+## @details Refer to the sitemap and submit the URLs of newer entries
+## through the Yandex.Webmaster API.  See the following post for more
+## details:
 ## https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html
 
 . submit-urls-common.sh && suc_parse_parameters "$@" || exit
