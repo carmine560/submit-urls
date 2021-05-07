@@ -17,7 +17,7 @@ default_configuration="readonly SITEMAP=https://example.com/sitemap.xml
 readonly SITE_URL=https://example.com/
 readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
-. configuration.sh && cfg_initialize_encryption || exit
+. encrypted_configuration.sh && ec_initialize_configuration || exit
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.
@@ -45,5 +45,5 @@ if [ "$dry_run" != true -a ! -z "$url_list" ]; then
          -H 'Content-Type: application/json; charset=utf-8' \
          -X POST $curl_options $curl_silent_options \
          $API_SERVICE/SubmitUrlBatch?apikey=$API_KEY || exit
-    cfg_set_encrypted_value last_submitted "$lastmod"
+    ec_set_value last_submitted "$lastmod"
 fi

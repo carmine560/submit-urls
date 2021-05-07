@@ -18,7 +18,7 @@ access_token=ACCESS_TOKEN
 readonly USER_ID=USER_ID
 readonly HOST_ID=HOST_ID
 last_submitted=$(date -u +%FT%TZ)"
-. configuration.sh && cfg_initialize_encryption || exit
+. encrypted_configuration.sh && ec_initialize_configuration || exit
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.
@@ -52,6 +52,6 @@ if [ "$dry_run" != true -a ! -z "$url_list" ]; then
              -H 'Content-Type: application/json; charset=utf-8' \
              -X POST $curl_options $curl_silent_options \
              $API_SERVICE/$USER_ID/hosts/$HOST_ID/recrawl/queue || exit
-        cfg_set_encrypted_value last_submitted "$lastmod"
+        ec_set_value last_submitted "$lastmod"
     done
 fi
