@@ -2,25 +2,25 @@
 ## @brief Read and write the plain or encrypted configuration file.
 
 if [ -d "$HOME/.config" ]; then
-    configuration=$HOME/.config/${0##*/}
+    readonly CONFIGURATION=$HOME/.config/${0##*/}
 else
-    configuration=$HOME/.${0##*/}
+    readonly CONFIGURATION=$HOME/.${0##*/}
 fi
 
 ## @fn cfg_initialize_configuration()
 ## @brief Execute the existing configuration file, or create it.
 ## @param $mode The mode of the configuration file.
 cfg_initialize_configuration() {
-    if [ -f "$configuration" ]; then
-        . "$configuration" || exit
+    if [ -f "$CONFIGURATION" ]; then
+        . "$CONFIGURATION" || exit
     else
-        read -p "$configuration does not exist.  Create it? [Y/n] "
+        read -p "$CONFIGURATION does not exist.  Create it? [Y/n] "
         if [ -z "$REPLY" ] || [[ $REPLY =~ ^[Yy] ]]; then
-            cat <<EOF >"$configuration" || exit
+            cat <<EOF >"$CONFIGURATION" || exit
 $default_configuration
 EOF
             if [ ! -z "$1" ]; then
-                chmod $1 "$configuration"
+                chmod $1 "$CONFIGURATION"
             fi
             exit
         else
@@ -34,12 +34,12 @@ EOF
 ## it.
 cfg_initialize_encryption() {
     readonly GPG_OPTIONS='--default-recipient-self --batch --yes'
-    if [ -f "$configuration.gpg" ]; then
-        eval "$(gpg -dq "$configuration.gpg" || echo exit $?)"
+    if [ -f "$CONFIGURATION.gpg" ]; then
+        eval "$(gpg -dq "$CONFIGURATION.gpg" || echo exit $?)"
     else
-        read -p "$configuration.gpg does not exist.  Create it? [Y/n] "
+        read -p "$CONFIGURATION.gpg does not exist.  Create it? [Y/n] "
         if [ -z "$REPLY" ] || [[ $REPLY =~ ^[Yy] ]]; then
-            cat <<EOF | gpg -e $GPG_OPTIONS -o "$configuration.gpg" || exit
+            cat <<EOF | gpg -e $GPG_OPTIONS -o "$CONFIGURATION.gpg" || exit
 $default_configuration
 EOF
             exit
@@ -57,7 +57,7 @@ EOF
 ## @param $replacement A replacement for the value.
 cfg_set_encrypted_value() {
     if [ $# != 0 -a $(($# % 2)) == 0 ]; then
-        cp "$configuration.gpg" "$configuration.gpg.bak" || exit
+        cp "$CONFIGURATION.gpg" "$CONFIGURATION.gpg.bak" || exit
         local index=0
         local parameters=("$@")
         local sed_commands
@@ -69,10 +69,10 @@ cfg_set_encrypted_value() {
             fi
             ((++index))
         done
-        gpg -dq "$configuration.gpg.bak" |
+        gpg -dq "$CONFIGURATION.gpg.bak" |
             sed -E "$sed_commands" |
-            gpg -e $GPG_OPTIONS -o "$configuration.gpg" || exit
-        rm "$configuration.gpg.bak" || exit
+            gpg -e $GPG_OPTIONS -o "$CONFIGURATION.gpg" || exit
+        rm "$CONFIGURATION.gpg.bak" || exit
     else
         echo Usage: ${FUNCNAME[0]} VARIABLE VALUE [VARIABLE VALUE ...] >&2
         exit 2
