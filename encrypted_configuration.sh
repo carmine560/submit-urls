@@ -2,9 +2,9 @@
 ## @brief Read and write the encrypted configuration file.
 
 if [ -d "$HOME/.config" ]; then
-    readonly CONFIGURATION=$HOME/.config/${0##*/}
+    readonly CONFIGURATION=$HOME/.config/$(basename "$0" .${0##*.}).cfg
 else
-    readonly CONFIGURATION=$HOME/.${0##*/}
+    readonly CONFIGURATION=$HOME/.$(basename "$0" .${0##*.}).cfg
 fi
 
 ## @fn ec_initialize_configuration()
