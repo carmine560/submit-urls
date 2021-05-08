@@ -45,9 +45,9 @@ cp -i *.sh ~/.local/bin
 
 ## Usage ##
 
-If the configuration file `~/.config/SCRIPT_NAME.gpg` does not exist,
-the following script will create and encrypt it assuming that the
-default key of GnuPG is your OpenPGP key pair.
+If the configuration file `~/.config/SCRIPT_BASENAME.cfg.gpg` does not
+exist, the following script will create and encrypt it assuming that
+the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
@@ -66,8 +66,8 @@ Then:
 submit-urls-bing.sh
 ```
 
-![Screenshot of GNOME Terminal where submit-urls-bing.sh was
-executed.](https://dl.dropboxusercontent.com/s/2oiwd056eiy22dk/20210506T141720.png)
+![A screenshot of GNOME Terminal where submit-urls-bing.sh was
+executed.](https://dl.dropboxusercontent.com/s/sx3od1rkt5kvd2n/20210508T210815.png)
 
 ### Yandex.Webmaster ###
 
@@ -91,8 +91,8 @@ Then:
 submit-urls-yandex.sh
 ```
 
-![Screenshot of GNOME Terminal where submit-urls-yandex.sh was
-executed.](https://dl.dropboxusercontent.com/s/9970gmvzd9ujd2m/20210504T205404.png)
+![A screenshot of GNOME Terminal where submit-urls-yandex.sh was
+executed.](https://dl.dropboxusercontent.com/s/dy0xjjramehpkmg/20210508T211203.png)
 
 ### Common Options ###
 
