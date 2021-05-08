@@ -103,8 +103,8 @@ executed.](https://dl.dropboxusercontent.com/s/dy0xjjramehpkmg/20210508T211203.p
 
 ## Known Issue ##
 
-`submit-urls-yandex.sh` repeats a request for each URL because the
-[queue
+The script `submit-urls-yandex.sh` repeats a request for each URL
+because the [queue
 method](https://yandex.com/dev/webmaster/doc/dg/reference/host-recrawl-post.html)
 of the API does not seem to support arrays.
 
