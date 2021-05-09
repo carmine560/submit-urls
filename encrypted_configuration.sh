@@ -6,12 +6,12 @@ if [ -d "$HOME/.config" ]; then
 else
     readonly CONFIGURATION=$HOME/.$(basename "$0" .${0##*.}).cfg
 fi
+readonly GPG_OPTIONS='--default-recipient-self --batch --yes'
 
 ## @fn ec_initialize_configuration()
 ## @brief Execute the existing encrypted configuration file, or create
 ## it.
 ec_initialize_configuration() {
-    readonly GPG_OPTIONS='--default-recipient-self --batch --yes'
     if [ -f "$CONFIGURATION.gpg" ]; then
         eval "$(gpg -dq "$CONFIGURATION.gpg" || echo exit $?)"
     else
