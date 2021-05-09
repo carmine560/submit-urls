@@ -18,7 +18,7 @@ access_token=ACCESS_TOKEN
 readonly USER_ID=USER_ID
 readonly HOST_ID=HOST_ID
 last_submitted=$(date -u +%FT%TZ)"
-. encrypted_configuration.sh && ec_initialize_configuration || exit
+. encrypted_configuration.sh initialize || exit
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.

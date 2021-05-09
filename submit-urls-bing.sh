@@ -17,7 +17,7 @@ default_configuration="readonly SITEMAP=https://example.com/sitemap.xml
 readonly SITE_URL=https://example.com/
 readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
-. encrypted_configuration.sh && ec_initialize_configuration || exit
+. encrypted_configuration.sh initialize || exit
 
 # Retrieve the sitemap and extract newer entries than the last
 # submitted entry.

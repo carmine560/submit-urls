@@ -26,6 +26,9 @@ EOF
         fi
     fi
 }
+if [ "$1" == initialize ]; then
+    ec_initialize_configuration
+fi
 
 ## @fn ec_set_value()
 ## @brief Store the value of a variable in the encrypted
