@@ -46,7 +46,7 @@ cp -i *.sh ~/.local/bin
 ## Usage ##
 
 If the configuration file `~/.config/SCRIPT_BASENAME.cfg.gpg` does not
-exist, the following script will create and encrypt it assuming that
+exist, the following scripts will create and encrypt it assuming that
 the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
