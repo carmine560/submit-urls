@@ -3,7 +3,7 @@
 <!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster or Yandex.Webmaster API -->
 
 Bash scripts that refer to the sitemap and submit the URLs of newer
-entries through the [Bing Webmaster
+entries than the last submission through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/) or
 [Yandex.Webmaster API](https://yandex.com/dev/webmaster/).
 
