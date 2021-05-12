@@ -3,9 +3,8 @@
 ## @file
 ## @brief Submit appropriate URLs through the Bing Webmaster API.
 ## @details Refer to the sitemap and submit the URLs of newer entries
-## through the Bing Webmaster API.  See the following post for more
-## details:
-## https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html
+## through the Bing Webmaster API.  For more details, see:
+## https://github.com/carmine560/submit-urls
 
 . submit-urls-common.sh && suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then
