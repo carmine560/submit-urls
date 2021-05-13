@@ -1,5 +1,7 @@
 ## @file
 ## @brief Perform intermediate processing of URL submission.
+## @details For more details, see:
+## https://github.com/carmine560/submit-urls
 
 set -o pipefail
 curl_options=-fSs
