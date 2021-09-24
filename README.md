@@ -2,6 +2,8 @@
 
 <!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster or Yandex.Webmaster API -->
 
+<!-- bash bing-api curl gnupg jq yandex-api yq -->
+
 Bash scripts that refer to the sitemap and submit the URLs of newer
 entries than the last submission through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/) or
