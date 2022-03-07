@@ -1,13 +1,12 @@
 # submit-urls #
 
-<!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster or Yandex.Webmaster API -->
+<!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster API -->
 
-<!-- bash bing-api curl gnupg jq yandex-api yq -->
+<!-- bash bing-api curl gnupg jq yq -->
 
 Bash scripts that refer to the sitemap and submit the URLs of newer
 entries than the last submission through the [Bing Webmaster
-API](https://docs.microsoft.com/en-us/bingwebmaster/) or
-[Yandex.Webmaster API](https://yandex.com/dev/webmaster/).
+API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
@@ -71,44 +70,12 @@ submit-urls-bing.sh
 ![A screenshot of GNOME Terminal where submit-urls-bing.sh was
 executed.](https://dl.dropboxusercontent.com/s/sx3od1rkt5kvd2n/20210508T210815.png)
 
-### Yandex.Webmaster ###
-
-Prepare an [access
-token](https://yandex.com/dev/oauth/doc/dg/tasks/get-oauth-token.html),
-[user
-ID](https://yandex.com/dev/webmaster/doc/dg/reference/user.html), and
-[host
-ID](https://yandex.com/dev/webmaster/doc/dg/reference/hosts.html) for
-authorization and using the API, and replace the values of the
-following variables in the configuration file with yours:
-
-  * `SITEMAP`
-  * `access_token`
-  * `USER_ID`
-  * `HOST_ID`
-
-Then:
-
-``` shell
-submit-urls-yandex.sh
-```
-
-![A screenshot of GNOME Terminal where submit-urls-yandex.sh was
-executed.](https://dl.dropboxusercontent.com/s/dy0xjjramehpkmg/20210508T211203.png)
-
 ### Common Options ###
 
   * `-n` (*dry run*) retrieves the sitemap and shows newer entries
     than the last submission but does not submit them.
   * `-s` (*silent*) does not show any output except for an error
     message from curl.
-
-## Known Issue ##
-
-The script `submit-urls-yandex.sh` repeats a request for each URL
-because the [queue
-method](https://yandex.com/dev/webmaster/doc/dg/reference/host-recrawl-post.html)
-of the API does not seem to support arrays.
 
 ## License ##
 
@@ -119,4 +86,3 @@ of the API does not seem to support arrays.
 Blog posts for more details:
 
   * [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
-  * [Bash Scripting to Submit Appropriate URLs through Yandex.Webmaster API](https://carmine560.blogspot.com/2021/04/bash-scripting-to-submit-appropriate.html)
