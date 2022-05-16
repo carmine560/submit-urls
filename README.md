@@ -72,10 +72,8 @@ executed.](https://dl.dropboxusercontent.com/s/sx3od1rkt5kvd2n/20210508T210815.p
 
 ### Common Options ###
 
-  * `-n` (*dry run*) retrieves the sitemap and shows newer entries
-    than the last submission but does not submit them.
-  * `-s` (*silent*) does not show any output except for an error
-    message from curl.
+  * `-n` (*dry run*) do not perform a POST request
+  * `-s` (*silent*) work silently
 
 ## License ##
 
