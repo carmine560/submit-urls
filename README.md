@@ -81,6 +81,6 @@ executed.](https://dl.dropboxusercontent.com/s/sx3od1rkt5kvd2n/20210508T210815.p
 
 ## Links ##
 
-Blog posts for more details:
-
-  * [Bash Scripting to Submit Appropriate URLs through Bing Webmaster API](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html)
+  * [*Bash Scripting to Submit Appropriate URLs through Bing Webmaster
+    API*](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html):
+    a blog post for more details.
