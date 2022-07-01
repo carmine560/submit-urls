@@ -45,9 +45,9 @@ ec_set_value() {
         local sed_commands
         while [ "$index" -lt ${#parameters[*]} ]; do
             if [ -z "$sed_commands" ]; then
-                sed_commands="s/^(\s*${parameters[index]}=).*$/\1${parameters[++index]}/"
+                sed_commands="s/^(\s*${parameters[index]}=).*$/\1${parameters[++index]//\//\\/}/"
             else
-                sed_commands="$sed_commands; s/^(\s*${parameters[index]}=).*$/\1${parameters[++index]}/"
+                sed_commands="$sed_commands; s/^(\s*${parameters[index]}=).*$/\1${parameters[++index]//\//\\/}/"
             fi
             ((++index))
         done
