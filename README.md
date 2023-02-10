@@ -1,17 +1,18 @@
 # submit-urls #
 
-<!-- Bash scripts that refer to sitemap and submit URLs through Bing Webmaster API -->
+<!-- Bash script that refers to sitemap and submits URLs through Bing
+Webmaster API -->
 
 <!-- bash bing-api curl gnupg jq yq -->
 
-Bash scripts that refer to the sitemap and submit the URLs of newer
-entries than the last submission through the [Bing Webmaster
+`submit-urls-bing.sh` refers to the sitemap and submits the URLs of
+newer entries than the last submission through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
-These scripts have been tested for Blogger on Debian bullseye on WSL 1
-and use the following packages:
+This script have been tested for Blogger on Debian on WSL 2 and use
+the following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   * xq included in the [yq](https://kislyuk.github.io/yq/) package to
@@ -29,26 +30,11 @@ sudo apt install jq
 sudo apt install gpg
 ```
 
-## Installation ##
-
-Make sure that Bash can find these scripts in the directories of the
-`PATH`.  For example:
-
-``` shell
-PATH=$HOME/path/to/submit-urls:$PATH
-```
-
-or
-
-``` shell
-cp -i *.sh ~/.local/bin
-```
-
 ## Usage ##
 
 If the configuration file `~/.config/SCRIPT_BASENAME.cfg.gpg` does not
-exist, the following scripts will create and encrypt it assuming that
-the default key of GnuPG is your OpenPGP key pair.
+exist, this script will create and encrypt it assuming that the
+default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
@@ -67,8 +53,8 @@ Then:
 submit-urls-bing.sh
 ```
 
-![A screenshot of GNOME Terminal where submit-urls-bing.sh was
-executed.](https://dl.dropboxusercontent.com/s/sx3od1rkt5kvd2n/20210508T210815.png)
+![A screenshot of Windows Terminal where submit-urls-bing.sh was
+executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.png)
 
 ### Common Options ###
 
