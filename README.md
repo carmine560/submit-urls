@@ -65,7 +65,7 @@ executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.p
 
 [MIT](LICENSE.md)
 
-## Links ##
+## Link ##
 
   * [*Bash Scripting to Submit Appropriate URLs through Bing Webmaster
     API*](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html):
