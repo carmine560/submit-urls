@@ -11,8 +11,8 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
-This script has been tested for Blogger on Debian on WSL 2 and uses
-the following packages:
+This script has been tested for Blogger on Debian on WSL and uses the
+following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   * `xq` included in the [yq](https://kislyuk.github.io/yq/) package
