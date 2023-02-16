@@ -58,8 +58,8 @@ executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.p
 
 ### Options ###
 
-  * `-n` (*dry run*) do not perform a POST request
-  * `-s` (*silent*) work silently
+  * `-n`: (*dry run*) do not perform a POST request
+  * `-s`: (*silent*) work silently
 
 ## License ##
 
