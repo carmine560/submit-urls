@@ -15,8 +15,8 @@ This script has been tested for Blogger on Debian on WSL 2 and uses
 the following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
-  * xq included in the [yq](https://kislyuk.github.io/yq/) package to
-    transcode XML to JSON
+  * `xq` included in the [yq](https://kislyuk.github.io/yq/) package
+    to transcode XML to JSON
   * [jq](https://stedolan.github.io/jq/) to filter JSON data
   * [GnuPG](https://gnupg.org/index.html) to encrypt the configuration
     file
@@ -32,8 +32,8 @@ sudo apt install gpg
 
 ## Usage ##
 
-If the configuration file `~/.config/SCRIPT_BASENAME.cfg.gpg` does not
-exist, this script will create and encrypt it assuming that the
+If the configuration file `~/.config/submit-urls-bing.cfg.gpg` does
+not exist, this script will create and encrypt it assuming that the
 default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
@@ -56,7 +56,7 @@ submit-urls-bing.sh
 ![A screenshot of Windows Terminal where submit-urls-bing.sh was
 executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.png)
 
-### Common Options ###
+### Options ###
 
   * `-n` (*dry run*) do not perform a POST request
   * `-s` (*silent*) work silently
