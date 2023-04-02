@@ -33,8 +33,8 @@ sudo apt install gpg
 ## Usage ##
 
 If the configuration file `~/.config/submit-urls-bing.cfg.gpg` does
-not exist, this script will create and encrypt it assuming that the
-default key of GnuPG is your OpenPGP key pair.
+not exist, this script will create and encrypt it.  It assumes that
+the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
