@@ -5,9 +5,9 @@ Webmaster API -->
 
 <!-- bash bing-api curl gnupg jq yq -->
 
-`submit-urls-bing.sh` refers to the sitemap and submits the URLs of
-newer entries than the last submission through the [Bing Webmaster
-API](https://docs.microsoft.com/en-us/bingwebmaster/).
+A `submit-urls-bing.sh` Bash script refers to the sitemap and submits
+the URLs of newer entries than the last submission through the [Bing
+Webmaster API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
@@ -32,9 +32,9 @@ sudo apt install gpg
 
 ## Usage ##
 
-If the configuration file `~/.config/submit-urls-bing.cfg.gpg` does
-not exist, this script will create and encrypt it.  It assumes that
-the default key of GnuPG is your OpenPGP key pair.
+If a `~/.config/submit-urls-bing.cfg.gpg` configuration file does not
+exist, this script will create and encrypt it.  It assumes that the
+default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
