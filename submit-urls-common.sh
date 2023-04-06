@@ -24,8 +24,8 @@ suc_parse_parameters() {
                 cat <<EOF >&2
 Usage: ${0##*/} [+-ns}
 
-  -n    (dry run) do not perform a POST request
-  -s    (silent) work silently
+  -n    do not perform a POST request
+  -s    work silently
 EOF
                 exit 2
         esac
