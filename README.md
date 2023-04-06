@@ -70,4 +70,4 @@ executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.p
 
   * [*Bash Scripting to Submit Appropriate URLs through Bing Webmaster
     API*](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html):
-    a blog post for more details.
+    a blog post for more details
