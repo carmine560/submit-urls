@@ -1,7 +1,7 @@
 # submit-urls #
 
-<!-- Bash script that refers to sitemap and submits URLs through Bing
-Webmaster API -->
+<!-- Bash script that refers to sitemap and submits URLs through Bing Webmaster
+API -->
 
 The `submit-urls-bing.sh` Bash script refers to the sitemap and submits the
 URLs of newer entries than the last submission through the [Bing Webmaster
