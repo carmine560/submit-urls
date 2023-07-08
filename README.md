@@ -50,9 +50,6 @@ Then:
 submit-urls-bing.sh
 ```
 
-![A screenshot of Windows Terminal where submit-urls-bing.sh was
-executed.](https://dl.dropboxusercontent.com/s/z59v9eur56naaa9/20230210T190706.png)
-
 ### Options ###
 
   * `-n`: do not perform a POST request
