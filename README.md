@@ -15,7 +15,7 @@ packages:
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   * `xq` included in the [`yq`](https://kislyuk.github.io/yq/) package to
     transcode XML to JSON
-  * [jq](https://stedolan.github.io/jq/) to filter JSON data
+  * [jq](https://jqlang.github.io/jq/) to filter JSON data
   * [GnuPG](https://gnupg.org/index.html) to encrypt the configuration file
 
 Install each package as needed.  For example:
