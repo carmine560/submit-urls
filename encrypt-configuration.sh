@@ -1,6 +1,7 @@
 ## @file
 ## @brief Read and write the encrypted configuration file.
-## @param string \c initialize invokes \c ec_initialize_configuration.
+## @param string \c initialize which invokes the \c ec_initialize_configuration
+## function.
 
 if [ -d "$HOME/.config" ]; then
     configuration_directory=$HOME/.config/$USER
@@ -15,8 +16,8 @@ fi
 readonly GPG_OPTIONS='--default-recipient-self --batch --yes'
 
 ## @fn ec_initialize_configuration()
-## @brief Execute the existing encrypted configuration file, or create
-## it.
+## @brief Execute the existing encrypted configuration file, or create a new
+## one if it does not exist.
 ec_initialize_configuration() {
     if [ -f "$CONFIGURATION.gpg" ]; then
         eval "$(gpg -dq "$CONFIGURATION.gpg" || echo exit $?)"
@@ -37,11 +38,10 @@ if [ "$1" == initialize ]; then
 fi
 
 ## @fn ec_set_value()
-## @brief Store the value of a variable in the encrypted
-## configuration.
+## @brief Store the value of a variable in the encrypted configuration file.
 ## @details Multiple pairs of parameters are allowed.
-## @param $regex A regular expression for a variable.
-## @param $replacement A replacement for the value.
+## @param $regex A regular expression that matches a variable.
+## @param $replacement A replacement value for the matched variable.
 ec_set_value() {
     if [ $# != 0 -a $(($# % 2)) == 0 ]; then
         cp "$CONFIGURATION.gpg" "$CONFIGURATION.gpg.bak" || exit

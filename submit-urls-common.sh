@@ -1,7 +1,6 @@
 ## @file
 ## @brief Perform intermediate processing of URL submission.
-## @details For more details, see:
-## https://github.com/carmine560/submit-urls
+## @details For more details, see: https://github.com/carmine560/submit-urls
 
 set -o pipefail
 curl_options=-fSs
@@ -57,7 +56,6 @@ suc_add_entries() {
                 unsubmitted_list=$unsubmitted_list$DELIMITER$unsubmitted_loc
             fi
         fi
-        # If the value of the expression is 0, the return status is 1.
         ((++index))
     done
 }

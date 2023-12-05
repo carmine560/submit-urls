@@ -2,8 +2,8 @@
 
 ## @file
 ## @brief Submit appropriate URLs through the Bing Webmaster API.
-## @details Refer to the sitemap and submit the URLs of newer entries
-## through the Bing Webmaster API.  For more details, see:
+## @details Refer to the sitemap and submit the URLs of newer entries through
+## the Bing Webmaster API.  For more details, see:
 ## https://github.com/carmine560/submit-urls
 
 . submit-urls-common.sh && suc_parse_parameters "$@" || exit
@@ -18,8 +18,7 @@ readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
 . encrypt-configuration.sh initialize || exit
 
-# Retrieve the sitemap and extract newer entries than the last
-# submitted entry.
+# Retrieve the sitemap and extract newer entries than the last submitted entry.
 newer_list=$(curl $curl_options "$SITEMAP" |
                  xq |
                  jq ".urlset.url[] | select(.lastmod > \"$last_submitted\")" |
