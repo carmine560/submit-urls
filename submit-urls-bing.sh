@@ -12,26 +12,22 @@ readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
 . encrypt-configuration.sh initialize || exit
 
-# Retrieve the sitemap and extract newer entries than the last submitted entry.
 newer_list=$(curl $curl_options "$SITEMAP" |
                  xq |
                  jq ".urlset.url[] | select(.lastmod > \"$last_submitted\")" |
                  jq -s 'sort_by(.lastmod)') || exit
 newer_length=$(echo $newer_list | jq length) || exit
 
-# Request the remaining daily quota for URL submission.
 read daily_quota monthly_quota \
      <<<$(curl -X GET $curl_options "$API_SERVICE/GetUrlSubmissionQuota?siteUrl=$SITE_URL&apikey=$API_KEY" |
               jq '.d | .DailyQuota, .MonthlyQuota' |
               paste - -) || exit
 
-# Add newer entries that you can submit to a URL list.
 suc_add_entries || exit
 if [ "$silent" != true ]; then
     suc_display_status || exit
 fi
 
-# Submit the URL list and store the date of the last submitted entry.
 if [ "$dry_run" != true -a ! -z "$url_list" ]; then
     curl -d "{\"siteUrl\": \"$SITE_URL\", \"urlList\": [${url_list//$DELIMITER/, }]}" \
          -H 'Content-Type: application/json; charset=utf-8' \
