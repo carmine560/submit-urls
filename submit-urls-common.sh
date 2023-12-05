@@ -1,14 +1,7 @@
-## @file
-## @brief Perform intermediate processing of URL submission.
-## @details For more details, see: https://github.com/carmine560/submit-urls
-
 set -o pipefail
 curl_options=-fSs
 readonly DELIMITER=$'\n'
 
-## @fn suc_parse_parameters()
-## @brief Parse the positional parameters.
-## @param $options Options.
 suc_parse_parameters() {
     while getopts :ns OPT; do
         case $OPT in
@@ -33,8 +26,6 @@ EOF
     OPTIND=1
 }
 
-## @fn suc_add_entries()
-## @brief Add newer entries that you can submit to a URL list.
 suc_add_entries() {
     local index=0
     local loc
@@ -60,8 +51,6 @@ suc_add_entries() {
     done
 }
 
-## @fn suc_display_status()
-## @brief Display the current status.
 suc_display_status() {
     local sgr
     local -r POSITIVE=32
