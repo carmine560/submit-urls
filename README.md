@@ -9,8 +9,8 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
-`submit-urls-bing.sh` has been tested for Blogger on Debian on WSL and uses the
-following packages:
+`submit-urls-bing.sh` has been tested for Blogger on Debian Testing on WSL and
+uses the following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   * `xq` included in the [`yq`](https://kislyuk.github.io/yq/) package to
@@ -18,7 +18,7 @@ following packages:
   * [jq](https://jqlang.github.io/jq/) to filter JSON data
   * [GnuPG](https://gnupg.org/index.html) to encrypt the configuration file
 
-Install each package as needed.  For example:
+Install each package as needed. For example:
 
 ``` shell
 sudo apt install curl
@@ -31,7 +31,7 @@ sudo apt install gpg
 
 `submit-urls-bing.sh` will create and encrypt a
 `~/.config/$USER/submit-urls-bing.cfg.gpg` configuration file if it does not
-exist.  It assumes that the default key of GnuPG is your OpenPGP key pair.
+exist. It assumes that the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
 
