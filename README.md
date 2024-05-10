@@ -9,8 +9,8 @@ API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
-`submit-urls-bing.sh` has been tested for Blogger on Debian Testing on WSL and
-uses the following packages:
+`submit-urls-bing.sh` has been tested for Blogger on Debian Testing on WSL 2
+and uses the following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
   * `xq` included in the [`yq`](https://kislyuk.github.io/yq/) package to
