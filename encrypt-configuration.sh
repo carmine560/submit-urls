@@ -1,5 +1,5 @@
 if [ -d "$HOME/.config" ]; then
-    configuration_directory=$HOME/.config/$USER
+    configuration_directory=$HOME/.config/$(basename "$(dirname "$0")")
     if [ ! -d "$configuration_directory" ]; then
         mkdir -v "$configuration_directory" || exit
     fi
