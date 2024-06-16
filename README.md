@@ -3,13 +3,13 @@
 <!-- Bash script that refers to sitemap and submits URLs through Bing Webmaster
 API -->
 
-The `submit-urls-bing.sh` Bash script refers to the sitemap and submits the
+The `submit_urls_bing.sh` Bash script refers to the sitemap and submits the
 URLs of newer entries than the last submission through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
 ## Prerequisites ##
 
-`submit-urls-bing.sh` has been tested for Blogger on Debian Testing on WSL 2
+`submit_urls_bing.sh` has been tested for Blogger on Debian Testing on WSL 2
 and uses the following packages:
 
   * [curl](https://curl.se/) to retrieve the sitemap and submit URLs
@@ -29,8 +29,8 @@ sudo apt install gpg
 
 ## Usage ##
 
-`submit-urls-bing.sh` will create and encrypt a
-`~/.config/submit-urls/submit-urls-bing.cfg.gpg` configuration file if it does
+`submit_urls_bing.sh` will create and encrypt a
+`~/.config/submit-urls/submit_urls_bing.cfg.gpg` configuration file if it does
 not exist. It assumes that the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster ###
@@ -47,7 +47,7 @@ configuration file with yours:
 Then:
 
 ``` shell
-submit-urls-bing.sh
+submit_urls_bing.sh
 ```
 
 ### Options ###

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. submit-urls-common.sh && suc_parse_parameters "$@" || exit
+. submit_urls_common.sh && suc_parse_parameters "$@" || exit
 if [ -z "$curl_silent_options" ]; then
     curl_options=$curl_options' -w \n'
 fi
@@ -10,7 +10,7 @@ default_configuration="readonly SITEMAP=https://example.com/sitemap.xml
 readonly SITE_URL=https://example.com/
 readonly API_KEY=API_KEY
 last_submitted=$(date -u +%FT%TZ)"
-. encrypt-configuration.sh initialize || exit
+. encrypt_configuration.sh initialize || exit
 
 newer_list=$(curl $curl_options "$SITEMAP" |
                  xq |
