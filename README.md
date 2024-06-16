@@ -7,7 +7,10 @@ The `submit_urls_bing.sh` Bash script refers to the sitemap and submits the
 URLs of newer entries than the last submission through the [Bing Webmaster
 API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
-## Prerequisites ##
+> **Note**: I plan to replace the Bash scripts in the `submit-urls` repository
+> with Python scripts.
+
+## `submit_urls_bing.sh` Prerequisites ##
 
 `submit_urls_bing.sh` has been tested for Blogger on Debian Testing on WSL 2
 and uses the following packages:
@@ -27,7 +30,7 @@ sudo apt install jq
 sudo apt install gpg
 ```
 
-## Usage ##
+## `submit_urls_bing.sh` Usage ##
 
 `submit_urls_bing.sh` will create and encrypt a
 `~/.config/submit-urls/submit_urls_bing.cfg.gpg` configuration file if it does
@@ -54,6 +57,54 @@ submit_urls_bing.sh
 
   * `-n`: do not perform a POST request
   * `-s`: work silently
+
+## `submit_urls_google.py` Prerequisites ##
+
+`submit_urls_google.py` has been tested for Blogger on Debian Testing on WSL 2
+and uses the following packages:
+
+  * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client/)
+    and [`oauth2client`](https://github.com/googleapis/oauth2client) to access
+    Google APIs <!-- TODO: replace oauth2client -->
+  * [`pandas`](https://pandas.pydata.org/) to extract updated URLs from the
+    sitemap
+  * [`python-gnupg`](https://github.com/vsajip/python-gnupg) to invoke
+    [GnuPG](https://gnupg.org/index.html) to decrypt your encrypted JSON key
+    file for authorization
+  * [`xmltodict`](https://github.com/martinblech/xmltodict) to convert the
+    sitemap to a dictionary
+
+Install each package as needed. For example:
+
+``` shell
+python -m pip install -r requirements.txt -U
+```
+
+## `submit_urls_google.py` Usage ##
+
+`submit_urls_google.py` will create a
+`~/.config/submit-urls/submit_urls_google.ini` configuration file if it does
+not exist.
+
+### Indexing API ###
+
+Prepare a [JSON key
+file](https://developers.google.com/search/apis/indexing-api/v3/prereqs) for
+authorization, and replace the values of the following options in the
+configuration file with yours:
+
+  * `sitemap_url`
+  * `json_keyfile`
+
+Then:
+
+``` shell
+submit_urls_google.py
+```
+
+### Options ###
+
+  * `-n`: do not perform a POST request
 
 ## License ##
 
