@@ -95,7 +95,7 @@ not exist.
 
 First, prepare your [JSON key
 file](https://developers.google.com/search/apis/indexing-api/v3/prereqs) for
-authorization and encrypt it using GnuPG with your OpenPGP key pair. Next,
+authorization, and encrypt it using GnuPG with your OpenPGP key pair. Next,
 replace the values of the following options in the configuration file with
 yours:
 
