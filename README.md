@@ -79,6 +79,9 @@ and uses the following packages:
 Install each package as needed. For example:
 
 ``` shell
+sudo apt install gpg
+python -m venv .venv
+. .venv/bin/activate
 python -m pip install -r requirements.txt -U
 ```
 
