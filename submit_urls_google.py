@@ -25,7 +25,7 @@ def main():
     """Parse arguments, configure settings, and synchronize URLs."""
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', action='store_true',
-                        help='(dry run) do not perform a POST request')
+                        help='do not perform POST requests')
     args = parser.parse_args()
 
     config_path = file_utilities.get_config_path(__file__)
@@ -40,9 +40,9 @@ def main():
         if args.n:
             pprint.pprint(url_list)
         else:
-            JSON_KEYFILE = section['json_keyfile']
+            JSON_KEY_FILE = section['json_key_file']
             gpg = gnupg.GPG()
-            with open(JSON_KEYFILE, 'rb') as f:
+            with open(JSON_KEY_FILE, 'rb') as f:
                 decrypted_data = gpg.decrypt_file(f)
 
             submit_urls(json.load(io.BytesIO(decrypted_data.data)), url_list)
@@ -58,8 +58,8 @@ def configure(config_path):
     config['Common'] = {
         'sitemap_url': 'HTTPS://EXAMPLE.COM/SITEMAP.XML',
         'last_submitted': datetime.now(timezone.utc).isoformat(),
-        'json_keyfile': os.path.join(os.path.dirname(config_path),
-                                     'KEYFILE.JSON.GPG')}
+        'json_key_file': os.path.join(os.path.dirname(config_path),
+                                      'KEY_FILE.JSON.GPG')}
     if os.path.isfile(config_path):
         config.read(config_path)
         return config
@@ -83,11 +83,11 @@ def add_entries(SITEMAP_URL, last_submitted):
     return newer.set_index('loc')['lastmod'].to_dict()
 
 
-def submit_urls(keyfile_dict, url_list):
+def submit_urls(key_file_dict, url_list):
     """Submit URLs to Google Index using a service account."""
     SCOPES = ['https://www.googleapis.com/auth/indexing']
     credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-        keyfile_dict, scopes=SCOPES)
+        key_file_dict, scopes=SCOPES)
     service = build('indexing', 'v3', credentials=credentials)
 
     def insert_event(request_id, response, exception):

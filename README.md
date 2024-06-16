@@ -1,14 +1,16 @@
 # submit-urls #
 
-<!-- Bash script that refers to sitemap and submits URLs through Bing Webmaster
-API -->
+<!-- Bash and Python scripts that refer to sitemap and submit URLs through Bing
+Webmaster API and Indexing API -->
 
-The `submit_urls_bing.sh` Bash script refers to the sitemap and submits the
-URLs of newer entries than the last submission through the [Bing Webmaster
-API](https://docs.microsoft.com/en-us/bingwebmaster/).
+The `submit_urls_bing.sh` Bash script and `submit_urls_google.py` Python script
+refer to the sitemap and submit the URLs of newer entries than the last
+submission through the [Bing Webmaster
+API](https://docs.microsoft.com/en-us/bingwebmaster/) and the [Indexing
+API](https://developers.google.com/search/apis/indexing-api/v3/quickstart).
 
-> **Note**: I plan to replace the Bash scripts in the `submit-urls` repository
-> with Python scripts.
+> **Note**: I plan to merge the Bash scripts into the Python scripts in the
+> `submit-urls` repository.
 
 ## `submit_urls_bing.sh` Prerequisites ##
 
@@ -36,7 +38,7 @@ sudo apt install gpg
 `~/.config/submit-urls/submit_urls_bing.cfg.gpg` configuration file if it does
 not exist. It assumes that the default key of GnuPG is your OpenPGP key pair.
 
-### Bing Webmaster ###
+### Bing Webmaster API ###
 
 Prepare an [API
 key](https://docs.microsoft.com/en-us/bingwebmaster/getting-access) for
@@ -55,7 +57,7 @@ submit_urls_bing.sh
 
 ### Options ###
 
-  * `-n`: do not perform a POST request
+  * `-n`: do not perform POST requests
   * `-s`: work silently
 
 ## `submit_urls_google.py` Prerequisites ##
@@ -88,13 +90,14 @@ not exist.
 
 ### Indexing API ###
 
-Prepare a [JSON key
+First, prepare a [JSON key
 file](https://developers.google.com/search/apis/indexing-api/v3/prereqs) for
-authorization, and replace the values of the following options in the
-configuration file with yours:
+authorization and encrypt it using GnuPG with your OpenPGP key pair. Next,
+replace the values of the following options in the configuration file with
+yours:
 
   * `sitemap_url`
-  * `json_keyfile`
+  * `json_key_file`
 
 Then:
 
@@ -104,7 +107,7 @@ submit_urls_google.py
 
 ### Options ###
 
-  * `-n`: do not perform a POST request
+  * `-n`: do not perform POST requests
 
 ## License ##
 

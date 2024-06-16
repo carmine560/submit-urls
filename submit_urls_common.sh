@@ -16,7 +16,7 @@ suc_parse_parameters() {
                 cat <<EOF >&2
 Usage: ${0##*/} [+-ns}
 
-  -n    do not perform a POST request
+  -n    do not perform POST requests
   -s    work silently
 EOF
                 exit 2
