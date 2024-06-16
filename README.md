@@ -40,7 +40,7 @@ not exist. It assumes that the default key of GnuPG is your OpenPGP key pair.
 
 ### Bing Webmaster API ###
 
-Prepare an [API
+Prepare your [API
 key](https://docs.microsoft.com/en-us/bingwebmaster/getting-access) for
 authorization, and replace the values of the following variables in the
 configuration file with yours:
@@ -93,7 +93,7 @@ not exist.
 
 ### Indexing API ###
 
-First, prepare a [JSON key
+First, prepare your [JSON key
 file](https://developers.google.com/search/apis/indexing-api/v3/prereqs) for
 authorization and encrypt it using GnuPG with your OpenPGP key pair. Next,
 replace the values of the following options in the configuration file with
