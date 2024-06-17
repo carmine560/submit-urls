@@ -66,8 +66,7 @@ submit_urls_bing.sh
 and uses the following packages:
 
   * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client/)
-    and [`oauth2client`](https://github.com/googleapis/oauth2client) to access
-    Google APIs <!-- TODO: replace oauth2client -->
+    to access Google APIs
   * [`pandas`](https://pandas.pydata.org/) to extract updated URLs from the
     sitemap
   * [`python-gnupg`](https://github.com/vsajip/python-gnupg) to invoke

@@ -11,8 +11,8 @@ import os
 import pprint
 import sys
 
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from oauth2client.service_account import ServiceAccountCredentials
 import gnupg
 import pandas as pd
 import requests
@@ -86,7 +86,7 @@ def add_entries(SITEMAP_URL, last_submitted):
 def submit_urls(key_file_dict, url_list):
     """Submit URLs to Google Index using a service account."""
     SCOPES = ['https://www.googleapis.com/auth/indexing']
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+    credentials = service_account.Credentials.from_service_account_info(
         key_file_dict, scopes=SCOPES)
     service = build('indexing', 'v3', credentials=credentials)
 
