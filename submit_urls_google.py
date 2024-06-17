@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-"""Synchronize local sitemap with remote URLs and update Google Index."""
+"""Synchronize sitemap URLs with the Google and Bing indices."""
 
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 import argparse
 import configparser
 import io
@@ -30,26 +31,33 @@ def main():
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
+    url_list = add_entries(config['Common']['sitemap_url'],
+                           config['Common']['last_submitted'])
 
-    section = config['Common']
-    SITEMAP_URL = section['sitemap_url']
-    last_submitted = section['last_submitted']
-    url_list = add_entries(SITEMAP_URL, last_submitted)
+    if not url_list:
+        return
+    if args.n:
+        pprint.pprint(url_list)
+        return
 
-    if url_list:
-        if args.n:
-            pprint.pprint(url_list)
-        else:
-            JSON_KEY_FILE = section['json_key_file']
-            gpg = gnupg.GPG()
-            with open(JSON_KEY_FILE, 'rb') as f:
-                decrypted_data = gpg.decrypt_file(f)
+    gpg = gnupg.GPG()
+    if config['Google'].getboolean('can_submit'):
+        with open(config['Google']['json_key_path'], 'rb') as f:
+            key_dictionary = json.load(
+                io.BytesIO(gpg.decrypt_file(f).data))
 
-            submit_urls(json.load(io.BytesIO(decrypted_data.data)), url_list)
+        submit_urls_to_google(key_dictionary, url_list)
+    if config['Bing'].getboolean('can_submit'):
+        with open(config['Bing']['api_key_path'], 'rb') as f:
+            api_key = gpg.decrypt(f.read()).data.decode().strip()
 
-            section['last_submitted'] = datetime.now(timezone.utc).isoformat()
-            with open(config_path, 'w') as f:
-                config.write(f)
+        parsed_url = urlparse(config['Common']['sitemap_url'])
+        site_url = f'{parsed_url.scheme}://{parsed_url.netloc}'
+        submit_urls_to_bing(api_key, site_url, list(url_list.keys()))
+
+    config['Common']['last_submitted'] = datetime.now(timezone.utc).isoformat()
+    with open(config_path, 'w') as f:
+        config.write(f)
 
 
 def configure(config_path):
@@ -57,9 +65,16 @@ def configure(config_path):
     config = configparser.ConfigParser()
     config['Common'] = {
         'sitemap_url': 'HTTPS://EXAMPLE.COM/SITEMAP.XML',
-        'last_submitted': datetime.now(timezone.utc).isoformat(),
-        'json_key_file': os.path.join(os.path.dirname(config_path),
-                                      'KEY_FILE.JSON.GPG')}
+        'last_submitted': datetime.now(timezone.utc).isoformat()}
+    config['Google'] = {
+        'can_submit': '1',
+        'json_key_path': os.path.join(os.path.dirname(config_path),
+                                      'JSON_KEY.JSON.GPG')}
+    config['Bing'] = {
+        'can_submit': '1',
+        'api_key_path': os.path.join(os.path.dirname(config_path),
+                                     'api_key.txt.gpg')}
+
     if os.path.isfile(config_path):
         config.read(config_path)
         return config
@@ -69,9 +84,9 @@ def configure(config_path):
             sys.exit()
 
 
-def add_entries(SITEMAP_URL, last_submitted):
+def add_entries(sitemap_url, last_submitted):
     """Extract and return updated URLs from a sitemap."""
-    response = requests.get(SITEMAP_URL)
+    response = requests.get(sitemap_url)
     sitemap = xmltodict.parse(response.text)
 
     entries = [[item['loc'], item['lastmod']]
@@ -83,26 +98,40 @@ def add_entries(SITEMAP_URL, last_submitted):
     return newer.set_index('loc')['lastmod'].to_dict()
 
 
-def submit_urls(key_file_dict, url_list):
-    """Submit URLs to Google Index using a service account."""
-    SCOPES = ['https://www.googleapis.com/auth/indexing']
-    credentials = service_account.Credentials.from_service_account_info(
-        key_file_dict, scopes=SCOPES)
-    service = build('indexing', 'v3', credentials=credentials)
-
-    def insert_event(request_id, response, exception):
+def submit_urls_to_google(key_dictionary, url_list):
+    """Submit URLs to the Google index using a service account."""
+    def handle_response(_, response, exception):
         """Handle the response or exception from each HTTP request."""
         if exception is not None:
             print(exception)
         else:
             print(response)
 
-    batch = service.new_batch_http_request(callback=insert_event)
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dictionary, scopes=['https://www.googleapis.com/auth/indexing'])
+    service = build('indexing', 'v3', credentials=credentials)
+    batch = service.new_batch_http_request(callback=handle_response)
+
     for url, api_type in url_list.items():
         batch.add(service.urlNotifications().publish(
             body={'url': url, 'type': api_type}))
 
     batch.execute()
+
+
+def submit_urls_to_bing(api_key, site_url, url_list):
+    """Submit URLs to the Bing index using an API key."""
+    try:
+        response = requests.post(
+            'https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlBatch'
+            f'?apikey={api_key}',
+            data=json.dumps({'siteUrl': site_url, 'urlList': url_list}),
+            headers={'Content-Type': 'application/json; charset=utf-8'})
+        response.raise_for_status()
+        print(response.json())
+    except requests.exceptions.RequestException as e:
+        print(e)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

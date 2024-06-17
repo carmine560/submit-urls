@@ -99,7 +99,7 @@ replace the values of the following options in the configuration file with
 yours:
 
   * `sitemap_url`
-  * `json_key_file`
+  * `json_key_path`
 
 Then:
 
