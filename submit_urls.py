@@ -43,8 +43,7 @@ def main():
     gpg = gnupg.GPG()
     if config['Google'].getboolean('can_submit'):
         with open(config['Google']['json_key_path'], 'rb') as f:
-            key_dictionary = json.load(
-                io.BytesIO(gpg.decrypt_file(f).data))
+            key_dictionary = json.load(io.BytesIO(gpg.decrypt_file(f).data))
 
         submit_urls_to_google(key_dictionary, url_list)
     if config['Bing'].getboolean('can_submit'):
@@ -52,8 +51,9 @@ def main():
             api_key = gpg.decrypt(f.read()).data.decode().strip()
 
         parsed_url = urlparse(config['Common']['sitemap_url'])
-        site_url = f'{parsed_url.scheme}://{parsed_url.netloc}'
-        submit_urls_to_bing(api_key, site_url, list(url_list.keys()))
+        submit_urls_to_bing(api_key,
+                            f'{parsed_url.scheme}://{parsed_url.netloc}',
+                            list(url_list.keys()))
 
     config['Common']['last_submitted'] = datetime.now(timezone.utc).isoformat()
     with open(config_path, 'w') as f:
