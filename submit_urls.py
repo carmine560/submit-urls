@@ -23,11 +23,10 @@ import file_utilities
 
 
 def main():
-    """Parse arguments, configure settings, and synchronize URLs."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-n', action='store_true',
-                        help='do not perform POST requests')
-    args = parser.parse_args()
+    """Parse arguments, configure settings, and submit URLs."""
+    args = get_arguments()
+
+    file_utilities.create_launchers_exit(args, __file__)
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
@@ -58,6 +57,16 @@ def main():
     config['Common']['last_submitted'] = datetime.now(timezone.utc).isoformat()
     with open(config_path, 'w') as f:
         config.write(f)
+
+
+def get_arguments():
+    """Parse and return command-line arguments."""
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    parser.add_argument('-n', action='store_true',
+                        help='do not perform POST requests')
+    file_utilities.add_launcher_options(group)
+    return parser.parse_args()
 
 
 def configure(config_path):
