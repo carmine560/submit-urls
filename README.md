@@ -58,8 +58,7 @@ submit_urls.py
 ### Options ###
 
   * `-n`: do not perform POST requests
-  * `-BS [OUTPUT_DIRECTORY]`: generate a Bash script to launch this script and
-    exit
+  * `-BS`: generate a Bash script to launch this script and exit
 
 ## License ##
 
