@@ -62,7 +62,7 @@ submit_urls.py
 
 ## License ##
 
-[MIT](LICENSE.md)
+The [MIT License](LICENSE.md)
 
 ## Link ##
 
