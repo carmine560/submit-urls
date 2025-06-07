@@ -64,7 +64,7 @@ submit_urls.py
 
 This project is licensed under the [MIT License](LICENSE.md). The `.gitignore`
 file is sourced from [`gitignore`](https://github.com/github/gitignore), which
-is licensed under CC0-1.0.
+is licensed under the CC0-1.0 license.
 
 ## Link ##
 
