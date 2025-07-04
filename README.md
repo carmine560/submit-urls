@@ -58,7 +58,8 @@ submit_urls.py
 ### Options ###
 
   * `-n`: do not perform POST requests
-  * `-BS`: generate a Bash script to launch this script and exit
+  * `-BS`: save a Bash script to `$HOME/Downloads` to launch this script and
+    exit
 
 ## License ##
 
