@@ -27,6 +27,8 @@ Install each package as needed. For example:
 
 ``` shell
 sudo apt install gpg
+git clone --recurse-submodules https://github.com/carmine560/submit-urls.git
+cd submit-urls
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements.txt -U

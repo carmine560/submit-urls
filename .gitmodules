@@ -1,3 +1,3 @@
 [submodule "shared_utilities"]
 	path = shared_utilities
-	url = https://github.com/carmine560/shared-utilities
+	url = https://github.com/carmine560/shared-utilities.git
