@@ -29,7 +29,7 @@ Install each package as needed. For example:
 sudo apt install gpg
 git clone --recurse-submodules git@github.com:carmine560/submit-urls.git
 cd submit-urls
-# Run 'git submodule init' and 'git submodule update' if you cloned without
+# Run 'git submodule update --init' if you cloned without
 # '--recurse-submodules'.
 python -m venv .venv
 . .venv/bin/activate
