@@ -27,7 +27,7 @@ Install each package as needed. For example:
 
 ``` shell
 sudo apt install gpg
-git clone --recurse-submodules https://github.com/carmine560/submit-urls.git
+git clone --recurse-submodules git@github.com:carmine560/submit-urls.git
 cd submit-urls
 # Run 'git submodule init' and 'git submodule update' if you cloned without
 # '--recurse-submodules'.
