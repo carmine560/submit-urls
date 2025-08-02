@@ -19,7 +19,7 @@ import pandas as pd
 import requests
 import xmltodict
 
-from shared_utilities import file_utilities
+from core_utilities import file_utilities
 
 
 def main():
