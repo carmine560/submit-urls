@@ -1,3 +1,4 @@
 [submodule "core_utilities"]
 	path = core_utilities
 	url = git@github.com:carmine560/core-utilities.git
+	branch = main
