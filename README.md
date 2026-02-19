@@ -1,4 +1,4 @@
-# submit-urls #
+# `submit-urls`
 
 <!-- Python script that refers to sitemap and submits URLs through Indexing API
 and Bing Webmaster API -->
@@ -8,7 +8,7 @@ of newer entries than the last submission through the [Indexing
 API](https://developers.google.com/search/apis/indexing-api/v3/quickstart) and
 the [Bing Webmaster API](https://docs.microsoft.com/en-us/bingwebmaster/).
 
-## Prerequisites ##
+## Prerequisites
 
 `submit_urls.py` has been tested for Blogger on Debian Testing on WSL 2 and
 requires the following packages:
@@ -36,7 +36,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt -U
 ```
 
-## Usage ##
+## Usage
 
 `submit_urls.py` will create a `~/.config/submit-urls/submit_urls.ini`
 configuration file if it does not already exist.
@@ -59,19 +59,19 @@ Then, execute:
 submit_urls.py
 ```
 
-### Options ###
+### Options
 
   * `-n`: do not perform POST requests
   * `-BS`: save a Bash script to `$HOME/Downloads` to launch this script and
     exit
 
-## License ##
+## License
 
 This project is licensed under the [MIT License](LICENSE). The `.gitignore`
 file is sourced from [`gitignore`](https://github.com/github/gitignore), which
 is licensed under the CC0-1.0 license.
 
-## Link ##
+## Link
 
   * [*Bash Scripting to Submit Appropriate URLs through Bing Webmaster
     API*](https://carmine560.blogspot.com/2020/12/bash-scripting-to-submit-urls-through.html):
