@@ -36,6 +36,13 @@ python -m venv .venv
 python -m pip install -r requirements.txt -U
 ```
 
+## Run Tests (Optional)
+
+``` shell
+python -m pip install -r requirements-dev.txt -U
+pytest
+```
+
 ## Usage
 
 `submit_urls.py` will create a `~/.config/submit-urls/submit_urls.ini`
