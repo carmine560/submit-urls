@@ -43,7 +43,7 @@ def main():
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
-    url_list = add_entries(
+    url_list, newest_submitted_at = add_entries(
         config["Common"]["sitemap_url"], config["Common"]["last_submitted"]
     )
 
@@ -68,7 +68,7 @@ def main():
             list(url_list.keys()),
         )
 
-    config["Common"]["last_submitted"] = datetime.now(timezone.utc).isoformat()
+    config["Common"]["last_submitted"] = newest_submitted_at.isoformat()
     with open(config_path, "w") as f:
         config.write(f)
 
@@ -114,7 +114,7 @@ def configure(config_path):
 
 
 def add_entries(sitemap_url, last_submitted):
-    """Extract and return updated URLs from a sitemap."""
+    """Extract updated URLs and the newest submitted timestamp."""
     response = requests.get(sitemap_url, timeout=HTTP_TIMEOUT_SECONDS)
     response.raise_for_status()
     sitemap = xmltodict.parse(response.text)
@@ -128,6 +128,7 @@ def add_entries(sitemap_url, last_submitted):
 
     last_submitted_at = parse_timestamp(last_submitted)
     newer = {}
+    newest_submitted_at = None
     for item in url_items:
         if not isinstance(item, dict):
             raise ValueError("Sitemap URL entry must be a mapping.")
@@ -138,10 +139,13 @@ def add_entries(sitemap_url, last_submitted):
             raise ValueError(
                 "Sitemap URL entry is missing 'loc' or 'lastmod'."
             )
-        if parse_timestamp(lastmod) > last_submitted_at:
+        lastmod_at = parse_timestamp(lastmod)
+        if lastmod_at > last_submitted_at:
             newer[loc] = "URL_UPDATED"
+            if newest_submitted_at is None or lastmod_at > newest_submitted_at:
+                newest_submitted_at = lastmod_at
 
-    return newer
+    return newer, newest_submitted_at
 
 
 def decrypt_data(path, decrypt_function):
