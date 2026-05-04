@@ -1,6 +1,7 @@
 """Tests for the sitemap and submission workflow."""
 
 import json
+import configparser
 
 import pytest
 
@@ -41,6 +42,93 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
     )
 
     assert result == {"https://example.com/new": "URL_UPDATED"}
+
+
+def test_configure_creates_default_config_and_exits(tmp_path):
+    config_path = tmp_path / "settings.ini"
+
+    with pytest.raises(SystemExit):
+        submit_urls.configure(str(config_path))
+
+    created = configparser.ConfigParser()
+    created.read(config_path, encoding="utf-8")
+
+    assert created["Common"]["sitemap_url"] == (
+        "HTTPS://EXAMPLE.COM/SITEMAP.XML"
+    )
+    assert created["Google"]["json_key_path"].endswith("JSON_KEY.JSON.GPG")
+    assert created["Bing"]["api_key_path"].endswith("api_key.txt.gpg")
+
+
+def test_submit_urls_to_google_batches_each_url(monkeypatch):
+    calls = {}
+    notifications = []
+
+    class _Batch:
+        def add(self, item):
+            notifications.append(item)
+
+        def execute(self):
+            calls["executed"] = True
+
+    class _Notifications:
+        def publish(self, body):
+            notifications.append(("body", body))
+            return body
+
+    class _Service:
+        def new_batch_http_request(self, callback):
+            calls["callback"] = callback
+            return _Batch()
+
+        def urlNotifications(self):
+            return _Notifications()
+
+    monkeypatch.setattr(
+        submit_urls.service_account.Credentials,
+        "from_service_account_info",
+        lambda info, scopes: {"info": info, "scopes": scopes},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "build",
+        lambda api, version, credentials: _Service(),
+    )
+
+    submit_urls.submit_urls_to_google(
+        {"client_email": "demo@example.com"},
+        {
+            "https://example.com/a": "URL_UPDATED",
+            "https://example.com/b": "URL_DELETED",
+        },
+    )
+
+    assert calls["executed"] is True
+    assert callable(calls["callback"])
+    assert notifications == [
+        (
+            "body",
+            {
+                "url": "https://example.com/a",
+                "type": "URL_UPDATED",
+            },
+        ),
+        {
+            "url": "https://example.com/a",
+            "type": "URL_UPDATED",
+        },
+        (
+            "body",
+            {
+                "url": "https://example.com/b",
+                "type": "URL_DELETED",
+            },
+        ),
+        {
+            "url": "https://example.com/b",
+            "type": "URL_DELETED",
+        },
+    ]
 
 
 def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
