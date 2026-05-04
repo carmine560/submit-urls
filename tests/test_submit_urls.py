@@ -13,6 +13,9 @@ class _Response:
     def __init__(self, text=""):
         self.text = text
 
+    def raise_for_status(self):
+        return None
+
 
 class _DecryptResult:
     def __init__(self, data=b"", ok=True, status=""):
@@ -48,12 +51,14 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
             ]
         }
     }
+    called = {}
 
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url: _Response("<xml />"),
-    )
+    def fake_get(url, timeout):
+        called["url"] = url
+        called["timeout"] = timeout
+        return _Response("<xml />")
+
+    monkeypatch.setattr(submit_urls.requests, "get", fake_get)
     monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
 
     result = submit_urls.add_entries(
@@ -62,13 +67,42 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
     )
 
     assert result == {"https://example.com/new": "URL_UPDATED"}
+    assert called == {
+        "url": "https://example.com/sitemap.xml",
+        "timeout": submit_urls.HTTP_TIMEOUT_SECONDS,
+    }
+
+
+def test_add_entries_raises_on_http_error(monkeypatch):
+    error = submit_urls.requests.exceptions.RequestException("bad response")
+
+    class _ErrorResponse:
+        text = "<html />"
+
+        def raise_for_status(self):
+            raise error
+
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url, timeout: _ErrorResponse(),
+    )
+
+    with pytest.raises(
+        submit_urls.requests.exceptions.RequestException,
+        match="bad response",
+    ):
+        submit_urls.add_entries(
+            "https://example.com/sitemap.xml",
+            "2024-01-01T00:00:00+00:00",
+        )
 
 
 def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
     monkeypatch.setattr(
         submit_urls.requests,
         "get",
-        lambda url: _Response("<xml />"),
+        lambda url, timeout: _Response("<xml />"),
     )
     monkeypatch.setattr(
         submit_urls.xmltodict,
@@ -222,10 +256,11 @@ def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
         def json(self):
             return {"status": "ok"}
 
-    def fake_post(url, data, headers):
+    def fake_post(url, data, headers, timeout):
         called["url"] = url
         called["data"] = data
         called["headers"] = headers
+        called["timeout"] = timeout
         return _PostResponse()
 
     monkeypatch.setattr(submit_urls.requests, "post", fake_post)
@@ -244,13 +279,14 @@ def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
     assert called["headers"] == {
         "Content-Type": "application/json; charset=utf-8",
     }
+    assert called["timeout"] == submit_urls.HTTP_TIMEOUT_SECONDS
     assert "{'status': 'ok'}" in capsys.readouterr().out
 
 
 def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
     error = submit_urls.requests.exceptions.RequestException("request failed")
 
-    def fake_post(url, data, headers):
+    def fake_post(url, data, headers, timeout):
         raise error
 
     monkeypatch.setattr(submit_urls.requests, "post", fake_post)

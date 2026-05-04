@@ -20,6 +20,8 @@ import xmltodict
 
 from core_utilities import file_utilities
 
+HTTP_TIMEOUT_SECONDS = 10
+
 
 class SubmissionError(Exception):
     """Represent a failure while preparing or submitting URLs."""
@@ -105,7 +107,8 @@ def configure(config_path):
 
 def add_entries(sitemap_url, last_submitted):
     """Extract and return updated URLs from a sitemap."""
-    response = requests.get(sitemap_url)
+    response = requests.get(sitemap_url, timeout=HTTP_TIMEOUT_SECONDS)
+    response.raise_for_status()
     sitemap = xmltodict.parse(response.text)
     url_items = sitemap.get("urlset", {}).get("url")
     if not url_items:
@@ -210,6 +213,7 @@ def submit_urls_to_bing(api_key, site_url, url_list):
             f"?apikey={api_key}",
             data=json.dumps({"siteUrl": site_url, "urlList": url_list}),
             headers={"Content-Type": "application/json; charset=utf-8"},
+            timeout=HTTP_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         print(response.json())
