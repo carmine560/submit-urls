@@ -15,11 +15,14 @@ import sys
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import gnupg
-import pandas as pd
 import requests
 import xmltodict
 
 from core_utilities import file_utilities
+
+
+class SubmissionError(Exception):
+    """Represent a failure while preparing or submitting URLs."""
 
 
 def main():
@@ -42,14 +45,12 @@ def main():
 
     gpg = gnupg.GPG()
     if config["Google"].getboolean("can_submit"):
-        with open(config["Google"]["json_key_path"], "rb") as f:
-            key_dictionary = json.load(io.BytesIO(gpg.decrypt_file(f).data))
-
+        key_dictionary = load_google_key(
+            config["Google"]["json_key_path"], gpg
+        )
         submit_urls_to_google(key_dictionary, url_list)
     if config["Bing"].getboolean("can_submit"):
-        with open(config["Bing"]["api_key_path"], "rb") as f:
-            api_key = gpg.decrypt(f.read()).data.decode().strip()
-
+        api_key = load_bing_api_key(config["Bing"]["api_key_path"], gpg)
         parsed_url = urlparse(config["Common"]["sitemap_url"])
         submit_urls_to_bing(
             api_key,
@@ -106,23 +107,79 @@ def add_entries(sitemap_url, last_submitted):
     """Extract and return updated URLs from a sitemap."""
     response = requests.get(sitemap_url)
     sitemap = xmltodict.parse(response.text)
+    url_items = sitemap.get("urlset", {}).get("url")
+    if not url_items:
+        raise ValueError("Sitemap does not contain any URL entries.")
+    if isinstance(url_items, dict):
+        url_items = [url_items]
+    if not isinstance(url_items, list):
+        raise ValueError("Sitemap URL entries must be a list or mapping.")
 
-    entries = [
-        [item["loc"], item["lastmod"]] for item in sitemap["urlset"]["url"]
-    ]
-    df = pd.DataFrame(entries, columns=("loc", "lastmod"))
-    newer = df[df.lastmod > last_submitted].copy()
-    newer.lastmod = "URL_UPDATED"
+    newer = {}
+    for item in url_items:
+        if not isinstance(item, dict):
+            raise ValueError("Sitemap URL entry must be a mapping.")
 
-    return newer.set_index("loc")["lastmod"].to_dict()
+        loc = item.get("loc")
+        lastmod = item.get("lastmod")
+        if not loc or not lastmod:
+            raise ValueError(
+                "Sitemap URL entry is missing 'loc' or 'lastmod'."
+            )
+        if lastmod > last_submitted:
+            newer[loc] = "URL_UPDATED"
+
+    return newer
+
+
+def decrypt_data(path, decrypt_function):
+    """Decrypt and validate secret data loaded from a file."""
+    with open(path, "rb") as f:
+        decrypted = decrypt_function(f)
+
+    if not getattr(decrypted, "ok", bool(getattr(decrypted, "data", b""))):
+        status = getattr(decrypted, "status", "decryption failed")
+        raise SubmissionError(status)
+    if not decrypted.data:
+        raise SubmissionError("Decryption returned no data.")
+    return decrypted.data
+
+
+def load_google_key(path, gpg):
+    """Load and validate the decrypted Google service account JSON."""
+    try:
+        return json.load(
+            io.BytesIO(
+                decrypt_data(
+                    path,
+                    lambda file_object: gpg.decrypt_file(file_object),
+                )
+            )
+        )
+    except json.JSONDecodeError as e:
+        raise SubmissionError("Google key is not valid JSON.") from e
+
+
+def load_bing_api_key(path, gpg):
+    """Load and validate the decrypted Bing API key."""
+    return (
+        decrypt_data(
+            path,
+            lambda file_object: gpg.decrypt(file_object.read()),
+        )
+        .decode()
+        .strip()
+    )
 
 
 def submit_urls_to_google(key_dictionary, url_list):
     """Submit URLs to the Google index using a service account."""
+    errors = []
 
     def handle_response(_, response, exception):
         """Handle the response or exception from each HTTP request."""
         if exception is not None:
+            errors.append(exception)
             print(exception)
         else:
             print(response)
@@ -141,6 +198,8 @@ def submit_urls_to_google(key_dictionary, url_list):
         )
 
     batch.execute()
+    if errors:
+        raise SubmissionError("Google submission failed.")
 
 
 def submit_urls_to_bing(api_key, site_url, url_list):
@@ -156,7 +215,7 @@ def submit_urls_to_bing(api_key, site_url, url_list):
         print(response.json())
     except requests.exceptions.RequestException as e:
         print(e)
-        sys.exit(1)
+        raise SubmissionError("Bing submission failed.") from e
 
 
 if __name__ == "__main__":

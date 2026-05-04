@@ -2,6 +2,7 @@
 
 import json
 import configparser
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,13 @@ import submit_urls
 class _Response:
     def __init__(self, text=""):
         self.text = text
+
+
+class _DecryptResult:
+    def __init__(self, data=b"", ok=True, status=""):
+        self.data = data
+        self.ok = ok
+        self.status = status
 
 
 def test_add_entries_returns_only_newer_urls(monkeypatch):
@@ -42,6 +50,25 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
     )
 
     assert result == {"https://example.com/new": "URL_UPDATED"}
+
+
+def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url: _Response("<xml />"),
+    )
+    monkeypatch.setattr(
+        submit_urls.xmltodict,
+        "parse",
+        lambda text: {"urlset": {"url": [{"loc": "https://example.com"}]}},
+    )
+
+    with pytest.raises(ValueError, match="missing 'loc' or 'lastmod'"):
+        submit_urls.add_entries(
+            "https://example.com/sitemap.xml",
+            "2024-01-01T00:00:00+00:00",
+        )
 
 
 def test_configure_creates_default_config_and_exits(tmp_path):
@@ -131,6 +158,48 @@ def test_submit_urls_to_google_batches_each_url(monkeypatch):
     ]
 
 
+def test_submit_urls_to_google_raises_on_batch_error(monkeypatch, capsys):
+    class _Batch:
+        def __init__(self, callback):
+            self.callback = callback
+
+        def add(self, item):
+            self.item = item
+
+        def execute(self):
+            self.callback(None, None, RuntimeError("google failed"))
+
+    class _Notifications:
+        def publish(self, body):
+            return body
+
+    class _Service:
+        def new_batch_http_request(self, callback):
+            return _Batch(callback)
+
+        def urlNotifications(self):
+            return _Notifications()
+
+    monkeypatch.setattr(
+        submit_urls.service_account.Credentials,
+        "from_service_account_info",
+        lambda info, scopes: {"info": info, "scopes": scopes},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "build",
+        lambda api, version, credentials: _Service(),
+    )
+
+    with pytest.raises(submit_urls.SubmissionError, match="Google"):
+        submit_urls.submit_urls_to_google(
+            {"client_email": "demo@example.com"},
+            {"https://example.com/a": "URL_UPDATED"},
+        )
+
+    assert "google failed" in capsys.readouterr().out
+
+
 def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
     called = {}
 
@@ -166,7 +235,7 @@ def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
     assert "{'status': 'ok'}" in capsys.readouterr().out
 
 
-def test_submit_urls_to_bing_exits_on_request_error(monkeypatch, capsys):
+def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
     error = submit_urls.requests.exceptions.RequestException("request failed")
 
     def fake_post(url, data, headers):
@@ -174,12 +243,164 @@ def test_submit_urls_to_bing_exits_on_request_error(monkeypatch, capsys):
 
     monkeypatch.setattr(submit_urls.requests, "post", fake_post)
 
-    with pytest.raises(SystemExit) as excinfo:
+    with pytest.raises(submit_urls.SubmissionError, match="Bing"):
         submit_urls.submit_urls_to_bing(
             "secret",
             "https://example.com",
             ["https://example.com/a"],
         )
 
-    assert excinfo.value.code == 1
     assert "request failed" in capsys.readouterr().out
+
+
+def test_load_google_key_raises_on_failed_decrypt(tmp_path):
+    key_path = tmp_path / "key.json.gpg"
+    key_path.write_bytes(b"encrypted")
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return _DecryptResult(ok=False, status="bad decrypt")
+
+    with pytest.raises(submit_urls.SubmissionError, match="bad decrypt"):
+        submit_urls.load_google_key(str(key_path), _Gpg())
+
+
+def test_load_google_key_raises_on_invalid_json(tmp_path):
+    key_path = tmp_path / "key.json.gpg"
+    key_path.write_bytes(b"encrypted")
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return _DecryptResult(data=b"not json")
+
+    with pytest.raises(submit_urls.SubmissionError, match="valid JSON"):
+        submit_urls.load_google_key(str(key_path), _Gpg())
+
+
+def test_main_does_not_update_last_submitted_on_google_failure(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "add_entries",
+        lambda sitemap_url, last_submitted: {
+            "https://example.com/a": "URL_UPDATED"
+        },
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path, gpg: {"client_email": "demo@example.com"},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        lambda key_dictionary, url_list: (_ for _ in ()).throw(
+            submit_urls.SubmissionError("Google submission failed.")
+        ),
+    )
+    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Google submission failed."
+    ):
+        submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-01T00:00:00+00:00"
+    )
+
+
+def test_main_does_not_update_last_submitted_on_decrypt_failure(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "add_entries",
+        lambda sitemap_url, last_submitted: {
+            "https://example.com/a": "URL_UPDATED"
+        },
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path, gpg: (_ for _ in ()).throw(
+            submit_urls.SubmissionError("bad decrypt")
+        ),
+    )
+    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
+
+    with pytest.raises(submit_urls.SubmissionError, match="bad decrypt"):
+        submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-01T00:00:00+00:00"
+    )

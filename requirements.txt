@@ -1,4 +1,3 @@
 google-api-python-client
-pandas
 python-gnupg
 xmltodict
