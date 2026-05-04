@@ -27,6 +27,14 @@ class SubmissionError(Exception):
     """Represent a failure while preparing or submitting URLs."""
 
 
+def parse_timestamp(value):
+    """Parse an ISO 8601 timestamp and normalize it to UTC."""
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def main():
     """Parse arguments, configure settings, and submit URLs."""
     args = get_arguments()
@@ -118,6 +126,7 @@ def add_entries(sitemap_url, last_submitted):
     if not isinstance(url_items, list):
         raise ValueError("Sitemap URL entries must be a list or mapping.")
 
+    last_submitted_at = parse_timestamp(last_submitted)
     newer = {}
     for item in url_items:
         if not isinstance(item, dict):
@@ -129,7 +138,7 @@ def add_entries(sitemap_url, last_submitted):
             raise ValueError(
                 "Sitemap URL entry is missing 'loc' or 'lastmod'."
             )
-        if lastmod > last_submitted:
+        if parse_timestamp(lastmod) > last_submitted_at:
             newer[loc] = "URL_UPDATED"
 
     return newer

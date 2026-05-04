@@ -73,6 +73,68 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
     }
 
 
+def test_add_entries_compares_timezone_aware_datetimes(monkeypatch):
+    sitemap = {
+        "urlset": {
+            "url": [
+                {
+                    "loc": "https://example.com/not-new",
+                    "lastmod": "2024-01-01T00:30:00+00:00",
+                },
+                {
+                    "loc": "https://example.com/new",
+                    "lastmod": "2024-01-01T00:00:00-01:00",
+                },
+            ]
+        }
+    }
+
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url, timeout: _Response("<xml />"),
+    )
+    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
+
+    result = submit_urls.add_entries(
+        "https://example.com/sitemap.xml",
+        "2024-01-01T00:45:00+00:00",
+    )
+
+    assert result == {"https://example.com/new": "URL_UPDATED"}
+
+
+def test_add_entries_compares_fractional_seconds(monkeypatch):
+    sitemap = {
+        "urlset": {
+            "url": [
+                {
+                    "loc": "https://example.com/new",
+                    "lastmod": "2024-01-01T00:00:00.000001+00:00",
+                },
+                {
+                    "loc": "https://example.com/same",
+                    "lastmod": "2024-01-01T00:00:00.000000+00:00",
+                },
+            ]
+        }
+    }
+
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url, timeout: _Response("<xml />"),
+    )
+    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
+
+    result = submit_urls.add_entries(
+        "https://example.com/sitemap.xml",
+        "2024-01-01T00:00:00+00:00",
+    )
+
+    assert result == {"https://example.com/new": "URL_UPDATED"}
+
+
 def test_add_entries_raises_on_http_error(monkeypatch):
     error = submit_urls.requests.exceptions.RequestException("bad response")
 
