@@ -21,6 +21,25 @@ def test_write_and_read_config_round_trip(tmp_path):
     assert loaded["General"]["name"] == "demo"
 
 
+def test_write_and_read_config_round_trip_encrypted(tmp_path):
+    config_path = tmp_path / "settings.ini"
+    written = configparser.ConfigParser()
+    written["General"] = {
+        "fingerprint": "stub",
+        "enabled": "true",
+        "name": "demo",
+    }
+
+    configuration.write_config(written, config_path, is_encrypted=True)
+
+    loaded = configparser.ConfigParser()
+    configuration.read_config(loaded, config_path, is_encrypted=True)
+
+    assert loaded["General"]["fingerprint"] == "stub"
+    assert loaded["General"]["enabled"] == "true"
+    assert loaded["General"]["name"] == "demo"
+
+
 def test_get_strict_boolean_accepts_only_true_false():
     config = configparser.ConfigParser()
     config["Flags"] = {"enabled": "true", "maybe": "yes"}

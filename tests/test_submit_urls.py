@@ -21,6 +21,18 @@ class _DecryptResult:
         self.status = status
 
 
+def test_decrypt_data_returns_decrypted_bytes(tmp_path):
+    secret_path = tmp_path / "secret.bin"
+    secret_path.write_bytes(b"payload")
+
+    def fake_decrypt(file_object):
+        return _DecryptResult(data=file_object.read(), ok=True)
+
+    assert (
+        submit_urls.decrypt_data(str(secret_path), fake_decrypt) == b"payload"
+    )
+
+
 def test_add_entries_returns_only_newer_urls(monkeypatch):
     sitemap = {
         "urlset": {
@@ -275,6 +287,17 @@ def test_load_google_key_raises_on_invalid_json(tmp_path):
 
     with pytest.raises(submit_urls.SubmissionError, match="valid JSON"):
         submit_urls.load_google_key(str(key_path), _Gpg())
+
+
+def test_load_bing_api_key_returns_stripped_text(tmp_path):
+    key_path = tmp_path / "key.txt.gpg"
+    key_path.write_bytes(b"encrypted")
+
+    class _Gpg:
+        def decrypt(self, data):
+            return _DecryptResult(data=b"secret-key \n")
+
+    assert submit_urls.load_bing_api_key(str(key_path), _Gpg()) == "secret-key"
 
 
 def test_main_does_not_update_last_submitted_on_google_failure(
