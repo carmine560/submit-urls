@@ -18,10 +18,12 @@ import gnupg
 import requests
 import xmltodict
 
+from core_utilities import configuration
 from core_utilities import file_utilities
 
 HTTP_TIMEOUT_SECONDS = 10
 DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
+PROVIDER_SECTIONS = ("Google", "Bing")
 
 
 class SubmissionError(Exception):
@@ -120,6 +122,20 @@ def validate_config(config):
         bing_key_path = get_required_option(config, "Bing", "api_key_path")
         validate_secret_path(bing_key_path, "Bing.api_key_path")
 
+    for section in PROVIDER_SECTIONS:
+        provider_last_submitted = config.get(
+            section, "last_submitted", fallback=""
+        ).strip()
+        if not provider_last_submitted:
+            continue
+        try:
+            parse_timestamp(provider_last_submitted)
+        except ValueError as e:
+            raise SubmissionError(
+                f"Config option '{section}.last_submitted' must be an "
+                "ISO 8601 timestamp."
+            ) from e
+
 
 # Sitemap Parsing
 
@@ -203,6 +219,38 @@ def load_bing_api_key(path, gpg):
 
 
 # Submission
+
+
+def get_enabled_provider_sections(config):
+    """Return provider sections that are enabled for submission."""
+    return [
+        section
+        for section in PROVIDER_SECTIONS
+        if config[section].getboolean("can_submit")
+    ]
+
+
+def get_provider_last_submitted(config, section):
+    """Return a provider checkpoint or fall back to the common one."""
+    provider_last_submitted = config.get(
+        section, "last_submitted", fallback=""
+    ).strip()
+    if provider_last_submitted:
+        return provider_last_submitted
+    return config["Common"]["last_submitted"]
+
+
+def sync_common_last_submitted(config):
+    """Keep the common checkpoint aligned to enabled providers."""
+    enabled_sections = get_enabled_provider_sections(config)
+    if not enabled_sections:
+        return
+
+    common_last_submitted = min(
+        parse_timestamp(get_provider_last_submitted(config, section))
+        for section in enabled_sections
+    )
+    config["Common"]["last_submitted"] = common_last_submitted.isoformat()
 
 
 def submit_urls_to_google(key_dictionary, url_list):
@@ -304,34 +352,54 @@ def main():
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
     validate_config(config)
-    url_list, newest_submitted_at = add_entries(
-        config["Common"]["sitemap_url"], config["Common"]["last_submitted"]
-    )
+    enabled_sections = get_enabled_provider_sections(config)
+    provider_updates = {}
+    preview_urls = {}
+    for section in enabled_sections:
+        url_list, newest_submitted_at = add_entries(
+            config["Common"]["sitemap_url"],
+            get_provider_last_submitted(config, section),
+        )
+        provider_updates[section] = (url_list, newest_submitted_at)
+        preview_urls.update(url_list)
 
-    if not url_list:
+    if not preview_urls:
+        sync_common_last_submitted(config)
+        configuration.write_config(config, config_path)
         return
     if args.n:
-        pprint.pprint(url_list)
+        pprint.pprint(preview_urls)
         return
 
     gpg = gnupg.GPG()
-    if config["Google"].getboolean("can_submit"):
+    google_url_list, google_newest_submitted_at = provider_updates.get(
+        "Google", ({}, None)
+    )
+    if google_url_list:
         key_dictionary = load_google_key(
             config["Google"]["json_key_path"], gpg
         )
-        submit_urls_to_google(key_dictionary, url_list)
-    if config["Bing"].getboolean("can_submit"):
+        submit_urls_to_google(key_dictionary, google_url_list)
+        config["Google"][
+            "last_submitted"
+        ] = google_newest_submitted_at.isoformat()
+        sync_common_last_submitted(config)
+        configuration.write_config(config, config_path)
+
+    bing_url_list, bing_newest_submitted_at = provider_updates.get(
+        "Bing", ({}, None)
+    )
+    if bing_url_list:
         api_key = load_bing_api_key(config["Bing"]["api_key_path"], gpg)
         parsed_url = urlparse(config["Common"]["sitemap_url"])
         submit_urls_to_bing(
             api_key,
             f"{parsed_url.scheme}://{parsed_url.netloc}",
-            list(url_list.keys()),
+            list(bing_url_list.keys()),
         )
-
-    config["Common"]["last_submitted"] = newest_submitted_at.isoformat()
-    with open(config_path, "w") as f:
-        config.write(f)
+        config["Bing"]["last_submitted"] = bing_newest_submitted_at.isoformat()
+        sync_common_last_submitted(config)
+        configuration.write_config(config, config_path)
 
 
 if __name__ == "__main__":

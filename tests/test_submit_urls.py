@@ -338,6 +338,31 @@ def test_validate_config_rejects_invalid_last_submitted(tmp_path):
         submit_urls.validate_config(config)
 
 
+def test_validate_config_rejects_invalid_provider_last_submitted(tmp_path):
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(google_key),
+        "last_submitted": "not-a-timestamp",
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="Google.last_submitted",
+    ):
+        submit_urls.validate_config(config)
+
+
 def test_submit_urls_to_google_batches_each_url(monkeypatch):
     calls = {}
     notifications = []
@@ -612,6 +637,136 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     )
 
 
+def test_main_persists_successful_provider_on_partial_failure(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    bing_key = tmp_path / "bing.txt.gpg"
+    bing_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(google_key),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": str(bing_key),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    add_entries_calls = []
+    google_submissions = []
+    bing_submissions = []
+    state = {"run": 0}
+
+    def fake_add_entries(sitemap_url, last_submitted):
+        add_entries_calls.append(last_submitted)
+        if state["run"] == 0:
+            return (
+                {"https://example.com/a": "URL_UPDATED"},
+                submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+            )
+        if last_submitted == "2024-01-02T00:00:00+00:00":
+            return ({}, None)
+        return (
+            {"https://example.com/a": "URL_UPDATED"},
+            submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+        )
+
+    def fake_submit_google(key_dictionary, url_list):
+        google_submissions.append(dict(url_list))
+
+    def fake_submit_bing(api_key, site_url, url_list):
+        bing_submissions.append(list(url_list))
+        if state["run"] == 0:
+            state["run"] = 1
+            raise submit_urls.SubmissionError("Bing submission failed.")
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(submit_urls, "add_entries", fake_add_entries)
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path, gpg: {"client_email": "demo@example.com"},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        fake_submit_google,
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_bing_api_key",
+        lambda path, gpg: "secret",
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_bing",
+        fake_submit_bing,
+    )
+    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Bing submission failed."
+    ):
+        submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert reloaded["Google"]["last_submitted"] == (
+        "2024-01-02T00:00:00+00:00"
+    )
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-01T00:00:00+00:00"
+    )
+    assert not reloaded["Bing"].get("last_submitted", fallback="")
+
+    submit_urls.main()
+
+    reloaded.read(config_path, encoding="utf-8")
+    assert google_submissions == [
+        {"https://example.com/a": "URL_UPDATED"},
+    ]
+    assert bing_submissions == [
+        ["https://example.com/a"],
+        ["https://example.com/a"],
+    ]
+    assert add_entries_calls == [
+        "2024-01-01T00:00:00+00:00",
+        "2024-01-01T00:00:00+00:00",
+        "2024-01-02T00:00:00+00:00",
+        "2024-01-01T00:00:00+00:00",
+    ]
+    assert reloaded["Google"]["last_submitted"] == (
+        "2024-01-02T00:00:00+00:00"
+    )
+    assert reloaded["Bing"]["last_submitted"] == ("2024-01-02T00:00:00+00:00")
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-02T00:00:00+00:00"
+    )
+
+
 def test_main_fails_fast_before_network_on_invalid_config(
     monkeypatch, tmp_path
 ):
@@ -816,6 +971,10 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
 
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
+    assert reloaded["Google"]["last_submitted"] == (
+        "2024-01-05T00:00:00+00:00"
+    )
+    assert reloaded["Bing"]["last_submitted"] == ("2024-01-05T00:00:00+00:00")
     assert reloaded["Common"]["last_submitted"] == (
         "2024-01-05T00:00:00+00:00"
     )
