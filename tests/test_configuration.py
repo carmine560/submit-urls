@@ -1,6 +1,7 @@
 """Tests for configuration file helpers."""
 
 import configparser
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,6 +39,48 @@ def test_write_and_read_config_round_trip_encrypted(tmp_path):
     assert loaded["General"]["fingerprint"] == "stub"
     assert loaded["General"]["enabled"] == "true"
     assert loaded["General"]["name"] == "demo"
+
+
+def test_read_config_encrypted_raises_on_failed_decrypt(tmp_path, monkeypatch):
+    config_path = tmp_path / "settings.ini"
+    encrypted_path = tmp_path / "settings.ini.gpg"
+    encrypted_path.write_bytes(b"ciphertext")
+
+    class _GPG:
+        def decrypt(self, data):
+            return SimpleNamespace(ok=False, status="bad passphrase", data=b"")
+
+    monkeypatch.setattr(configuration.gnupg, "GPG", _GPG)
+
+    with pytest.raises(
+        configuration.ConfigError,
+        match="GPG decryption failed while reading config: bad passphrase",
+    ):
+        configuration.read_config(
+            configparser.ConfigParser(), config_path, is_encrypted=True
+        )
+
+
+def test_read_config_encrypted_raises_on_empty_decrypt_data(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "settings.ini"
+    encrypted_path = tmp_path / "settings.ini.gpg"
+    encrypted_path.write_bytes(b"ciphertext")
+
+    class _GPG:
+        def decrypt(self, data):
+            return SimpleNamespace(ok=True, status="", data=b"")
+
+    monkeypatch.setattr(configuration.gnupg, "GPG", _GPG)
+
+    with pytest.raises(
+        configuration.ConfigError,
+        match="GPG decryption returned no config data.",
+    ):
+        configuration.read_config(
+            configparser.ConfigParser(), config_path, is_encrypted=True
+        )
 
 
 def test_get_strict_boolean_accepts_only_true_false():
