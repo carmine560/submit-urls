@@ -32,7 +32,7 @@ def test_decrypt_data_returns_decrypted_bytes(tmp_path):
         return _DecryptResult(data=file_object.read(), ok=True)
 
     assert (
-        submit_urls.decrypt_data(str(secret_path), fake_decrypt) == b"payload"
+        submit_urls._decrypt_data(str(secret_path), fake_decrypt) == b"payload"
     )
 
 

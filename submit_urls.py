@@ -28,6 +28,9 @@ class SubmissionError(Exception):
     """Represent a failure while preparing or submitting URLs."""
 
 
+# Config Helpers
+
+
 def get_required_option(config, section, option):
     """Return a required config value or raise a clear validation error."""
     if not config.has_section(section):
@@ -54,6 +57,9 @@ def get_required_boolean_option(config, section, option):
         raise SubmissionError(
             f"Config option '{section}.{option}' must be a boolean value."
         ) from e
+
+
+# Validation Helpers
 
 
 def parse_timestamp(value):
@@ -111,83 +117,7 @@ def validate_config(config):
         validate_secret_path(bing_key_path, "Bing.api_key_path")
 
 
-def main():
-    """Parse arguments, configure settings, and submit URLs."""
-    args = get_arguments()
-
-    file_utilities.create_launchers_exit(args, __file__)
-
-    config_path = file_utilities.get_config_path(__file__)
-    config = configure(config_path)
-    validate_config(config)
-    url_list, newest_submitted_at = add_entries(
-        config["Common"]["sitemap_url"], config["Common"]["last_submitted"]
-    )
-
-    if not url_list:
-        return
-    if args.n:
-        pprint.pprint(url_list)
-        return
-
-    gpg = gnupg.GPG()
-    if config["Google"].getboolean("can_submit"):
-        key_dictionary = load_google_key(
-            config["Google"]["json_key_path"], gpg
-        )
-        submit_urls_to_google(key_dictionary, url_list)
-    if config["Bing"].getboolean("can_submit"):
-        api_key = load_bing_api_key(config["Bing"]["api_key_path"], gpg)
-        parsed_url = urlparse(config["Common"]["sitemap_url"])
-        submit_urls_to_bing(
-            api_key,
-            f"{parsed_url.scheme}://{parsed_url.netloc}",
-            list(url_list.keys()),
-        )
-
-    config["Common"]["last_submitted"] = newest_submitted_at.isoformat()
-    with open(config_path, "w") as f:
-        config.write(f)
-
-
-def get_arguments():
-    """Parse and return command-line arguments."""
-    parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group()
-    parser.add_argument(
-        "-n", action="store_true", help="do not perform POST requests"
-    )
-    file_utilities.add_launcher_options(group)
-    return parser.parse_args()
-
-
-def configure(config_path):
-    """Create or read a configuration file."""
-    config = configparser.ConfigParser()
-    config["Common"] = {
-        "sitemap_url": DEFAULT_SITEMAP_URL,
-        "last_submitted": datetime.now(timezone.utc).isoformat(),
-    }
-    config["Google"] = {
-        "can_submit": "1",
-        "json_key_path": os.path.join(
-            os.path.dirname(config_path), "JSON_KEY.JSON.GPG"
-        ),
-    }
-    config["Bing"] = {
-        "can_submit": "1",
-        "api_key_path": os.path.join(
-            os.path.dirname(config_path), "api_key.txt.gpg"
-        ),
-    }
-
-    if os.path.isfile(config_path):
-        config.read(config_path)
-        return config
-    else:
-        with open(config_path, "w") as f:
-            config.write(f)
-            sys.exit()
+# Sitemap Parsing
 
 
 def add_entries(sitemap_url, last_submitted):
@@ -225,7 +155,10 @@ def add_entries(sitemap_url, last_submitted):
     return newer, newest_submitted_at
 
 
-def decrypt_data(path, decrypt_function):
+# Secret Loading
+
+
+def _decrypt_data(path, decrypt_function):
     """Decrypt and validate secret data loaded from a file."""
     with open(path, "rb") as f:
         decrypted = decrypt_function(f)
@@ -243,7 +176,7 @@ def load_google_key(path, gpg):
     try:
         return json.load(
             io.BytesIO(
-                decrypt_data(
+                _decrypt_data(
                     path,
                     lambda file_object: gpg.decrypt_file(file_object),
                 )
@@ -256,13 +189,16 @@ def load_google_key(path, gpg):
 def load_bing_api_key(path, gpg):
     """Load and validate the decrypted Bing API key."""
     return (
-        decrypt_data(
+        _decrypt_data(
             path,
             lambda file_object: gpg.decrypt(file_object.read()),
         )
         .decode()
         .strip()
     )
+
+
+# Submission
 
 
 def submit_urls_to_google(key_dictionary, url_list):
@@ -310,6 +246,88 @@ def submit_urls_to_bing(api_key, site_url, url_list):
     except requests.exceptions.RequestException as e:
         print(e)
         raise SubmissionError("Bing submission failed.") from e
+
+
+# Entry Point
+
+
+def get_arguments():
+    """Parse and return command-line arguments."""
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    parser.add_argument(
+        "-n", action="store_true", help="do not perform POST requests"
+    )
+    file_utilities.add_launcher_options(group)
+    return parser.parse_args()
+
+
+def configure(config_path):
+    """Create or read a configuration file."""
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": DEFAULT_SITEMAP_URL,
+        "last_submitted": datetime.now(timezone.utc).isoformat(),
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": os.path.join(
+            os.path.dirname(config_path), "JSON_KEY.JSON.GPG"
+        ),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": os.path.join(
+            os.path.dirname(config_path), "api_key.txt.gpg"
+        ),
+    }
+
+    if os.path.isfile(config_path):
+        config.read(config_path)
+        return config
+    else:
+        with open(config_path, "w") as f:
+            config.write(f)
+            sys.exit()
+
+
+def main():
+    """Parse arguments, configure settings, and submit URLs."""
+    args = get_arguments()
+
+    file_utilities.create_launchers_exit(args, __file__)
+
+    config_path = file_utilities.get_config_path(__file__)
+    config = configure(config_path)
+    validate_config(config)
+    url_list, newest_submitted_at = add_entries(
+        config["Common"]["sitemap_url"], config["Common"]["last_submitted"]
+    )
+
+    if not url_list:
+        return
+    if args.n:
+        pprint.pprint(url_list)
+        return
+
+    gpg = gnupg.GPG()
+    if config["Google"].getboolean("can_submit"):
+        key_dictionary = load_google_key(
+            config["Google"]["json_key_path"], gpg
+        )
+        submit_urls_to_google(key_dictionary, url_list)
+    if config["Bing"].getboolean("can_submit"):
+        api_key = load_bing_api_key(config["Bing"]["api_key_path"], gpg)
+        parsed_url = urlparse(config["Common"]["sitemap_url"])
+        submit_urls_to_bing(
+            api_key,
+            f"{parsed_url.scheme}://{parsed_url.netloc}",
+            list(url_list.keys()),
+        )
+
+    config["Common"]["last_submitted"] = newest_submitted_at.isoformat()
+    with open(config_path, "w") as f:
+        config.write(f)
 
 
 if __name__ == "__main__":
