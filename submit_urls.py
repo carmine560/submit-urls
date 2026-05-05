@@ -21,10 +21,39 @@ import xmltodict
 from core_utilities import file_utilities
 
 HTTP_TIMEOUT_SECONDS = 10
+DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
 
 
 class SubmissionError(Exception):
     """Represent a failure while preparing or submitting URLs."""
+
+
+def get_required_option(config, section, option):
+    """Return a required config value or raise a clear validation error."""
+    if not config.has_section(section):
+        raise SubmissionError(f"Missing required config section '{section}'.")
+    if not config.has_option(section, option):
+        raise SubmissionError(
+            f"Missing required config option '{section}.{option}'."
+        )
+
+    value = config.get(section, option).strip()
+    if not value:
+        raise SubmissionError(
+            f"Config option '{section}.{option}' must not be empty."
+        )
+    return value
+
+
+def get_required_boolean_option(config, section, option):
+    """Return a required boolean config value or raise a clear error."""
+    get_required_option(config, section, option)
+    try:
+        return config.getboolean(section, option)
+    except ValueError as e:
+        raise SubmissionError(
+            f"Config option '{section}.{option}' must be a boolean value."
+        ) from e
 
 
 def parse_timestamp(value):
@@ -35,6 +64,53 @@ def parse_timestamp(value):
     return parsed.astimezone(timezone.utc)
 
 
+def validate_url(value, option_name):
+    """Validate a URL before any network work is attempted."""
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise SubmissionError(
+            f"Config option '{option_name}' must be a valid HTTP(S) URL."
+        )
+    if value == DEFAULT_SITEMAP_URL:
+        raise SubmissionError(
+            f"Config option '{option_name}' still uses the default "
+            "placeholder value."
+        )
+
+
+def validate_secret_path(path, option_name):
+    """Validate a configured secret path before any decryption work."""
+    if not os.path.isfile(path):
+        raise SubmissionError(
+            f"Configured file '{option_name}' does not exist: {path}"
+        )
+
+
+def validate_config(config):
+    """Validate config values before network or GPG work begins."""
+    sitemap_url = get_required_option(config, "Common", "sitemap_url")
+    validate_url(sitemap_url, "Common.sitemap_url")
+
+    last_submitted = get_required_option(config, "Common", "last_submitted")
+    try:
+        parse_timestamp(last_submitted)
+    except ValueError as e:
+        raise SubmissionError(
+            "Config option 'Common.last_submitted' must be an ISO 8601 "
+            "timestamp."
+        ) from e
+
+    if get_required_boolean_option(config, "Google", "can_submit"):
+        google_key_path = get_required_option(
+            config, "Google", "json_key_path"
+        )
+        validate_secret_path(google_key_path, "Google.json_key_path")
+
+    if get_required_boolean_option(config, "Bing", "can_submit"):
+        bing_key_path = get_required_option(config, "Bing", "api_key_path")
+        validate_secret_path(bing_key_path, "Bing.api_key_path")
+
+
 def main():
     """Parse arguments, configure settings, and submit URLs."""
     args = get_arguments()
@@ -43,6 +119,7 @@ def main():
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
+    validate_config(config)
     url_list, newest_submitted_at = add_entries(
         config["Common"]["sitemap_url"], config["Common"]["last_submitted"]
     )
@@ -88,7 +165,7 @@ def configure(config_path):
     """Create or read a configuration file."""
     config = configparser.ConfigParser()
     config["Common"] = {
-        "sitemap_url": "HTTPS://EXAMPLE.COM/SITEMAP.XML",
+        "sitemap_url": DEFAULT_SITEMAP_URL,
         "last_submitted": datetime.now(timezone.utc).isoformat(),
     }
     config["Google"] = {

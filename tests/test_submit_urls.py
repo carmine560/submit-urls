@@ -273,6 +273,71 @@ def test_configure_creates_default_config_and_exits(tmp_path):
     assert created["Bing"]["api_key_path"].endswith("api_key.txt.gpg")
 
 
+def test_validate_config_rejects_placeholder_sitemap_url(tmp_path):
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "HTTPS://EXAMPLE.COM/SITEMAP.XML",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "0",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="default placeholder value"
+    ):
+        submit_urls.validate_config(config)
+
+
+def test_validate_config_rejects_missing_enabled_secret_path(tmp_path):
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Google.json_key_path"
+    ):
+        submit_urls.validate_config(config)
+
+
+def test_validate_config_rejects_invalid_last_submitted(tmp_path):
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "not-a-timestamp",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(google_key),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="must be an ISO 8601 timestamp"
+    ):
+        submit_urls.validate_config(config)
+
+
 def test_submit_urls_to_google_batches_each_url(monkeypatch):
     calls = {}
     notifications = []
@@ -480,6 +545,8 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch, tmp_path
 ):
     config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
@@ -487,7 +554,7 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     }
     config["Google"] = {
         "can_submit": "1",
-        "json_key_path": str(tmp_path / "google.json.gpg"),
+        "json_key_path": str(google_key),
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -545,10 +612,59 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     )
 
 
+def test_main_fails_fast_before_network_on_invalid_config(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "HTTPS://EXAMPLE.COM/SITEMAP.XML",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "0",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+
+    def fail_add_entries(*args, **kwargs):
+        raise AssertionError("add_entries should not be called")
+
+    monkeypatch.setattr(submit_urls, "add_entries", fail_add_entries)
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="default placeholder value"
+    ):
+        submit_urls.main()
+
+
 def test_main_does_not_update_last_submitted_on_decrypt_failure(
     monkeypatch, tmp_path
 ):
     config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
@@ -556,7 +672,7 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
     }
     config["Google"] = {
         "can_submit": "1",
-        "json_key_path": str(tmp_path / "google.json.gpg"),
+        "json_key_path": str(google_key),
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -609,6 +725,10 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
 
 def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    bing_key = tmp_path / "bing.txt.gpg"
+    bing_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
@@ -616,11 +736,11 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     }
     config["Google"] = {
         "can_submit": "1",
-        "json_key_path": str(tmp_path / "google.json.gpg"),
+        "json_key_path": str(google_key),
     }
     config["Bing"] = {
         "can_submit": "1",
-        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+        "api_key_path": str(bing_key),
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -705,6 +825,8 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
     monkeypatch, tmp_path
 ):
     config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
@@ -712,7 +834,7 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
     }
     config["Google"] = {
         "can_submit": "1",
-        "json_key_path": str(tmp_path / "google.json.gpg"),
+        "json_key_path": str(google_key),
     }
     config["Bing"] = {
         "can_submit": "0",
