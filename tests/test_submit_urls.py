@@ -3,6 +3,7 @@
 import json
 import configparser
 from types import SimpleNamespace
+from xml.parsers.expat import ExpatError
 
 import pytest
 
@@ -33,6 +34,18 @@ def test_decrypt_data_returns_decrypted_bytes(tmp_path):
 
     assert (
         submit_urls._decrypt_data(str(secret_path), fake_decrypt) == b"payload"
+    )
+
+
+def test_parse_timestamp_normalizes_z_suffix():
+    assert submit_urls.parse_timestamp("2024-01-01T00:00:00Z") == (
+        submit_urls.parse_timestamp("2024-01-01T00:00:00+00:00")
+    )
+
+
+def test_parse_timestamp_treats_naive_values_as_utc():
+    assert submit_urls.parse_timestamp("2024-01-01T00:00:00") == (
+        submit_urls.parse_timestamp("2024-01-01T00:00:00+00:00")
     )
 
 
@@ -238,6 +251,24 @@ def test_add_entries_raises_on_http_error(monkeypatch):
         )
 
 
+def test_add_entries_raises_on_http_timeout(monkeypatch):
+    error = submit_urls.requests.exceptions.RequestException("timed out")
+
+    def fake_get(url, timeout):
+        raise error
+
+    monkeypatch.setattr(submit_urls.requests, "get", fake_get)
+
+    with pytest.raises(
+        submit_urls.requests.exceptions.RequestException,
+        match="timed out",
+    ):
+        submit_urls.add_entries(
+            "https://example.com/sitemap.xml",
+            "2024-01-01T00:00:00+00:00",
+        )
+
+
 def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
     monkeypatch.setattr(
         submit_urls.requests,
@@ -251,6 +282,25 @@ def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="missing 'loc' or 'lastmod'"):
+        submit_urls.add_entries(
+            "https://example.com/sitemap.xml",
+            "2024-01-01T00:00:00+00:00",
+        )
+
+
+def test_add_entries_propagates_xml_parse_error(monkeypatch):
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url, timeout: _Response("<xml />"),
+    )
+
+    def fail_parse(text):
+        raise ExpatError("not well-formed")
+
+    monkeypatch.setattr(submit_urls.xmltodict, "parse", fail_parse)
+
+    with pytest.raises(ExpatError, match="not well-formed"):
         submit_urls.add_entries(
             "https://example.com/sitemap.xml",
             "2024-01-01T00:00:00+00:00",
@@ -529,6 +579,24 @@ def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
         )
 
     assert "request failed" in capsys.readouterr().out
+
+
+def test_submit_urls_to_bing_raises_on_timeout(monkeypatch, capsys):
+    error = submit_urls.requests.exceptions.RequestException("timed out")
+
+    def fake_post(url, data, headers, timeout):
+        raise error
+
+    monkeypatch.setattr(submit_urls.requests, "post", fake_post)
+
+    with pytest.raises(submit_urls.SubmissionError, match="Bing"):
+        submit_urls.submit_urls_to_bing(
+            "secret",
+            "https://example.com",
+            ["https://example.com/a"],
+        )
+
+    assert "timed out" in capsys.readouterr().out
 
 
 def test_load_google_key_raises_on_failed_decrypt(tmp_path):
