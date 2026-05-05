@@ -1,7 +1,11 @@
 """Tests for file backup behavior."""
 
 from datetime import datetime
+import io
 import os
+import tarfile
+
+import pytest
 
 from core_utilities import file_utilities
 
@@ -72,3 +76,51 @@ def test_backup_file_skips_duplicate_content_and_prunes_old_versions(tmp_path):
     ]
     assert backups[0].read_text(encoding="utf-8") == "second"
     assert backups[1].read_text(encoding="utf-8") == "third"
+
+
+def test_backup_file_propagates_copy_errors(tmp_path, monkeypatch):
+    source = tmp_path / "sample.txt"
+    backup_directory = tmp_path / "backups"
+    _write_file(source, "first", 1_700_000_000)
+
+    def fail_copy(source_path, destination_path):
+        raise OSError("copy failed")
+
+    monkeypatch.setattr(file_utilities.shutil, "copy2", fail_copy)
+
+    with pytest.raises(OSError, match="copy failed"):
+        file_utilities.backup_file(
+            str(source),
+            backup_directory=str(backup_directory),
+            number_of_backups=1,
+        )
+
+
+def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "archive.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
+    (output_directory / "archive-root").write_text(
+        "blocking", encoding="utf-8"
+    )
+
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
+        file_info = tarfile.TarInfo("archive-root")
+        file_info.size = 0
+        tar.addfile(file_info)
+    tar_stream.seek(0)
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return type(
+                "_DecryptResult", (), {"data": tar_stream.getvalue()}
+            )()
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(FileExistsError, match="archive-root file exists"):
+        file_utilities.decrypt_extract_file(str(source), str(output_directory))

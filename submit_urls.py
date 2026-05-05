@@ -28,6 +28,10 @@ class SubmissionError(Exception):
     """Represent a failure while preparing or submitting URLs."""
 
 
+class ConfigCreated(Exception):
+    """Signal that a default config file was created for the user."""
+
+
 # Config Helpers
 
 
@@ -285,10 +289,10 @@ def configure(config_path):
     if os.path.isfile(config_path):
         config.read(config_path)
         return config
-    else:
-        with open(config_path, "w") as f:
-            config.write(f)
-            sys.exit()
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+    raise ConfigCreated
 
 
 def main():
@@ -331,4 +335,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ConfigCreated:
+        sys.exit()

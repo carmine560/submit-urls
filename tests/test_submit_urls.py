@@ -257,10 +257,10 @@ def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
         )
 
 
-def test_configure_creates_default_config_and_exits(tmp_path):
+def test_configure_creates_default_config_and_raises_config_created(tmp_path):
     config_path = tmp_path / "settings.ini"
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(submit_urls.ConfigCreated):
         submit_urls.configure(str(config_path))
 
     created = configparser.ConfigParser()
