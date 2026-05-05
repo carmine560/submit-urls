@@ -124,3 +124,63 @@ def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
 
     with pytest.raises(FileExistsError, match="archive-root file exists"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
+
+
+def test_decrypt_extract_file_rejects_parent_directory_member(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "archive.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
+
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
+        root_info = tarfile.TarInfo("archive-root")
+        root_info.type = tarfile.DIRTYPE
+        tar.addfile(root_info)
+        file_info = tarfile.TarInfo("../escape.txt")
+        file_info.size = len(b"attack")
+        tar.addfile(file_info, io.BytesIO(b"attack"))
+    tar_stream.seek(0)
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return type(
+                "_DecryptResult", (), {"data": tar_stream.getvalue()}
+            )()
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(ValueError, match=r"\.\./escape.txt"):
+        file_utilities.decrypt_extract_file(str(source), str(output_directory))
+
+    assert not (tmp_path / "escape.txt").exists()
+
+
+def test_decrypt_extract_file_rejects_absolute_member(tmp_path, monkeypatch):
+    source = tmp_path / "archive.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
+
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
+        root_info = tarfile.TarInfo("archive-root")
+        root_info.type = tarfile.DIRTYPE
+        tar.addfile(root_info)
+        file_info = tarfile.TarInfo("/tmp/escape.txt")
+        file_info.size = len(b"attack")
+        tar.addfile(file_info, io.BytesIO(b"attack"))
+    tar_stream.seek(0)
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return type(
+                "_DecryptResult", (), {"data": tar_stream.getvalue()}
+            )()
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(ValueError, match="/tmp/escape.txt"):
+        file_utilities.decrypt_extract_file(str(source), str(output_directory))
