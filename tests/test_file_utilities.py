@@ -4,6 +4,7 @@ from datetime import datetime
 import io
 import os
 import tarfile
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,6 +20,10 @@ def _backup_name(timestamp):
     return datetime.fromtimestamp(timestamp).strftime(
         "sample-%Y%m%dT%H%M%S.txt"
     )
+
+
+def _decrypt_result(data):
+    return SimpleNamespace(ok=True, status="", data=data)
 
 
 def test_backup_file_creates_versioned_copy(tmp_path):
@@ -116,9 +121,7 @@ def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
 
     class _Gpg:
         def decrypt_file(self, file_object):
-            return type(
-                "_DecryptResult", (), {"data": tar_stream.getvalue()}
-            )()
+            return _decrypt_result(tar_stream.getvalue())
 
     monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
 
@@ -146,9 +149,7 @@ def test_decrypt_extract_file_rejects_parent_directory_member(
 
     class _Gpg:
         def decrypt_file(self, file_object):
-            return type(
-                "_DecryptResult", (), {"data": tar_stream.getvalue()}
-            )()
+            return _decrypt_result(tar_stream.getvalue())
 
     monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
 
@@ -176,9 +177,7 @@ def test_decrypt_extract_file_rejects_absolute_member(tmp_path, monkeypatch):
 
     class _Gpg:
         def decrypt_file(self, file_object):
-            return type(
-                "_DecryptResult", (), {"data": tar_stream.getvalue()}
-            )()
+            return _decrypt_result(tar_stream.getvalue())
 
     monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
 
