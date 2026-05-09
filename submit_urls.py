@@ -18,6 +18,7 @@ import gnupg
 import requests
 import xmltodict
 
+from core_utilities import config_io
 from core_utilities import file_utilities
 
 HTTP_TIMEOUT_SECONDS = 10
@@ -252,12 +253,6 @@ def sync_common_last_submitted(config):
     config["Common"]["last_submitted"] = common_last_submitted.isoformat()
 
 
-def write_config(config, config_path):
-    """Persist the current config state using UTF-8 encoding."""
-    with open(config_path, "w", encoding="utf-8") as f:
-        config.write(f)
-
-
 def submit_urls_to_google(key_dictionary, url_list):
     """Submit URLs to the Google index using a service account."""
     errors = []
@@ -343,8 +338,7 @@ def configure(config_path):
         config.read(config_path)
         return config
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        config.write(f)
+    config_io.write_config(config, config_path)
     raise ConfigCreated
 
 
@@ -370,7 +364,7 @@ def main():
 
     if not preview_urls:
         sync_common_last_submitted(config)
-        write_config(config, config_path)
+        config_io.write_config(config, config_path)
         return
     if args.n:
         pprint.pprint(preview_urls)
@@ -389,7 +383,7 @@ def main():
             "last_submitted"
         ] = google_newest_submitted_at.isoformat()
         sync_common_last_submitted(config)
-        write_config(config, config_path)
+        config_io.write_config(config, config_path)
 
     bing_url_list, bing_newest_submitted_at = provider_updates.get(
         "Bing", ({}, None)
@@ -404,7 +398,7 @@ def main():
         )
         config["Bing"]["last_submitted"] = bing_newest_submitted_at.isoformat()
         sync_common_last_submitted(config)
-        write_config(config, config_path)
+        config_io.write_config(config, config_path)
 
 
 if __name__ == "__main__":
