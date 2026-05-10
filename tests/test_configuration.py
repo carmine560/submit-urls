@@ -139,3 +139,39 @@ def test_config_common_imports_without_prompt_toolkit(monkeypatch):
             reloaded.CustomWordCompleter(("value",))
     finally:
         sys.modules["core_utilities.config_common"] = original_module
+
+
+def test_config_prompt_imports_without_prompt_toolkit(monkeypatch):
+    original_module = sys.modules.get("core_utilities.config_prompt")
+    monkeypatch.delitem(sys.modules, "prompt_toolkit", raising=False)
+    monkeypatch.delitem(
+        sys.modules,
+        "prompt_toolkit.completion",
+        raising=False,
+    )
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "prompt_toolkit" or name.startswith("prompt_toolkit."):
+            raise ModuleNotFoundError("No module named 'prompt_toolkit'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.delitem(
+        sys.modules,
+        "core_utilities.config_prompt",
+        raising=False,
+    )
+
+    try:
+        reloaded = importlib.import_module("core_utilities.config_prompt")
+        assert isinstance(
+            reloaded.PROMPT_TOOLKIT_IMPORT_ERROR,
+            ModuleNotFoundError,
+        )
+        with pytest.raises(reloaded.ConfigError, match="prompt_toolkit"):
+            reloaded.prompt_for_input("value", value="existing")
+    finally:
+        if original_module is not None:
+            sys.modules["core_utilities.config_prompt"] = original_module
