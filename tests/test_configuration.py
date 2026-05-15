@@ -27,6 +27,26 @@ def test_write_and_read_config_round_trip(tmp_path):
     assert loaded["General"]["name"] == "demo"
 
 
+def test_write_config_keeps_existing_file_when_replace_fails(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "settings.ini"
+    config_path.write_text("original", encoding="utf-8")
+    written = configparser.ConfigParser()
+    written["General"] = {"enabled": "true"}
+
+    def fail_replace(source, destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(config_io.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        config_io.write_config(written, config_path)
+
+    assert config_path.read_text(encoding="utf-8") == "original"
+    assert not list(tmp_path.glob(".settings.ini.*.tmp"))
+
+
 def test_write_and_read_config_round_trip_encrypted(tmp_path):
     config_path = tmp_path / "settings.ini"
     written = configparser.ConfigParser()
@@ -44,6 +64,30 @@ def test_write_and_read_config_round_trip_encrypted(tmp_path):
     assert loaded["General"]["fingerprint"] == "stub"
     assert loaded["General"]["enabled"] == "true"
     assert loaded["General"]["name"] == "demo"
+
+
+def test_write_config_encrypted_keeps_existing_file_when_replace_fails(
+    tmp_path, monkeypatch
+):
+    config_path = tmp_path / "settings.ini"
+    encrypted_path = tmp_path / "settings.ini.gpg"
+    encrypted_path.write_bytes(b"original")
+    written = configparser.ConfigParser()
+    written["General"] = {
+        "fingerprint": "stub",
+        "enabled": "true",
+    }
+
+    def fail_replace(source, destination):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(config_io.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        config_io.write_config(written, config_path, is_encrypted=True)
+
+    assert encrypted_path.read_bytes() == b"original"
+    assert not list(tmp_path.glob(".settings.ini.gpg.*.tmp"))
 
 
 def test_read_config_encrypted_raises_on_failed_decrypt(tmp_path, monkeypatch):
