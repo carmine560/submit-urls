@@ -32,6 +32,44 @@ def _decrypt_result(data):
     return SimpleNamespace(ok=True, status="", data=data)
 
 
+def test_archive_encrypt_directory_raises_when_no_gpg_keys(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "source"
+    source.mkdir()
+
+    class _Gpg:
+        def list_keys(self):
+            return []
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(
+        file_utilities.UtilityOperationError,
+        match="No usable GPG keys found.",
+    ):
+        file_utilities.archive_encrypt_directory(str(source), str(tmp_path))
+
+
+def test_archive_encrypt_directory_raises_when_gpg_key_has_no_fingerprint(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "source"
+    source.mkdir()
+
+    class _Gpg:
+        def list_keys(self):
+            return [{}]
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(
+        file_utilities.UtilityOperationError,
+        match="GPG key has no fingerprint.",
+    ):
+        file_utilities.archive_encrypt_directory(str(source), str(tmp_path))
+
+
 def test_backup_file_creates_versioned_copy(tmp_path):
     source = tmp_path / "sample.txt"
     backup_directory = tmp_path / "backups"
