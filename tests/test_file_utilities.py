@@ -107,22 +107,17 @@ def test_backup_file_propagates_copy_errors(tmp_path, monkeypatch):
         )
 
 
-def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
+def test_decrypt_extract_file_raises_when_archive_is_empty(
     tmp_path, monkeypatch
 ):
     source = tmp_path / "archive.tar.xz.gpg"
     source.write_bytes(b"encrypted")
     output_directory = tmp_path / "output"
     output_directory.mkdir()
-    (output_directory / "archive-root").write_text(
-        "blocking", encoding="utf-8"
-    )
 
     tar_stream = io.BytesIO()
-    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
-        file_info = tarfile.TarInfo("archive-root")
-        file_info.size = 0
-        tar.addfile(file_info)
+    with tarfile.open(fileobj=tar_stream, mode="w:xz"):
+        pass
     tar_stream.seek(0)
 
     class _Gpg:
@@ -131,7 +126,10 @@ def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
 
     monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
 
-    with pytest.raises(FileExistsError, match="archive-root file exists"):
+    with pytest.raises(
+        file_utilities.UtilityOperationError,
+        match="Archive contains no files",
+    ):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
 
 
@@ -223,6 +221,34 @@ def test_decrypt_extract_file_rejects_special_member(
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
 
     assert not (output_directory / "archive-root" / "special").exists()
+
+
+def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "archive.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
+    (output_directory / "archive-root").write_text(
+        "blocking", encoding="utf-8"
+    )
+
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
+        file_info = tarfile.TarInfo("archive-root")
+        file_info.size = 0
+        tar.addfile(file_info)
+    tar_stream.seek(0)
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return _decrypt_result(tar_stream.getvalue())
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(FileExistsError, match="archive-root file exists"):
+        file_utilities.decrypt_extract_file(str(source), str(output_directory))
 
 
 def test_get_config_path_uses_xdg_config_home_when_set(monkeypatch, tmp_path):
