@@ -10,6 +10,12 @@ import pytest
 
 from core_utilities import file_utilities
 
+SPECIAL_TAR_MEMBER_TYPES = (
+    tarfile.FIFOTYPE,
+    tarfile.CHRTYPE,
+    tarfile.BLKTYPE,
+)
+
 
 def _write_file(path, text, timestamp):
     path.write_text(text, encoding="utf-8")
@@ -183,6 +189,40 @@ def test_decrypt_extract_file_rejects_absolute_member(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="/tmp/escape.txt"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
+
+
+@pytest.mark.parametrize(
+    "member_type",
+    SPECIAL_TAR_MEMBER_TYPES,
+)
+def test_decrypt_extract_file_rejects_special_member(
+    tmp_path, monkeypatch, member_type
+):
+    source = tmp_path / "archive.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
+
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode="w:xz") as tar:
+        root_info = tarfile.TarInfo("archive-root")
+        root_info.type = tarfile.DIRTYPE
+        tar.addfile(root_info)
+        special_info = tarfile.TarInfo("archive-root/special")
+        special_info.type = member_type
+        tar.addfile(special_info)
+    tar_stream.seek(0)
+
+    class _Gpg:
+        def decrypt_file(self, file_object):
+            return _decrypt_result(tar_stream.getvalue())
+
+    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+
+    with pytest.raises(ValueError, match="archive-root/special"):
+        file_utilities.decrypt_extract_file(str(source), str(output_directory))
+
+    assert not (output_directory / "archive-root" / "special").exists()
 
 
 def test_get_config_path_uses_xdg_config_home_when_set(monkeypatch, tmp_path):
