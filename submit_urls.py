@@ -140,8 +140,8 @@ def validate_config(config):
 # Sitemap Parsing
 
 
-def add_entries(sitemap_url, last_submitted):
-    """Extract updated URLs and the newest submitted timestamp."""
+def get_sitemap_entries(sitemap_url):
+    """Fetch sitemap URL entries."""
     response = requests.get(sitemap_url, timeout=HTTP_TIMEOUT_SECONDS)
     response.raise_for_status()
     sitemap = xmltodict.parse(response.text)
@@ -152,7 +152,11 @@ def add_entries(sitemap_url, last_submitted):
         url_items = [url_items]
     if not isinstance(url_items, list):
         raise ValueError("Sitemap URL entries must be a list or mapping.")
+    return url_items
 
+
+def get_updated_entries(url_items, last_submitted):
+    """Extract updated URLs and the newest submitted timestamp."""
     last_submitted_at = parse_timestamp(last_submitted)
     newer = {}
     newest_submitted_at = None
@@ -352,11 +356,12 @@ def main():
     config = configure(config_path)
     validate_config(config)
     enabled_sections = get_enabled_provider_sections(config)
+    url_items = get_sitemap_entries(config["Common"]["sitemap_url"])
     provider_updates = {}
     preview_urls = {}
     for section in enabled_sections:
-        url_list, newest_submitted_at = add_entries(
-            config["Common"]["sitemap_url"],
+        url_list, newest_submitted_at = get_updated_entries(
+            url_items,
             get_provider_last_submitted(config, section),
         )
         provider_updates[section] = (url_list, newest_submitted_at)

@@ -49,7 +49,7 @@ def test_parse_timestamp_treats_naive_values_as_utc():
     )
 
 
-def test_add_entries_returns_only_newer_urls(monkeypatch):
+def test_get_sitemap_entries_fetches_url_items(monkeypatch):
     sitemap = {
         "urlset": {
             "url": [
@@ -74,159 +74,16 @@ def test_add_entries_returns_only_newer_urls(monkeypatch):
     monkeypatch.setattr(submit_urls.requests, "get", fake_get)
     monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
 
-    result, newest_submitted_at = submit_urls.add_entries(
-        "https://example.com/sitemap.xml",
-        "2024-01-01T00:00:00+00:00",
-    )
+    result = submit_urls.get_sitemap_entries("https://example.com/sitemap.xml")
 
-    assert result == {"https://example.com/new": "URL_UPDATED"}
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-02T00:00:00+00:00"
-    )
+    assert result == sitemap["urlset"]["url"]
     assert called == {
         "url": "https://example.com/sitemap.xml",
         "timeout": submit_urls.HTTP_TIMEOUT_SECONDS,
     }
 
 
-def test_add_entries_compares_timezone_aware_datetimes(monkeypatch):
-    sitemap = {
-        "urlset": {
-            "url": [
-                {
-                    "loc": "https://example.com/not-new",
-                    "lastmod": "2024-01-01T00:30:00+00:00",
-                },
-                {
-                    "loc": "https://example.com/new",
-                    "lastmod": "2024-01-01T00:00:00-01:00",
-                },
-            ]
-        }
-    }
-
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url, timeout: _Response("<xml />"),
-    )
-    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
-
-    result, newest_submitted_at = submit_urls.add_entries(
-        "https://example.com/sitemap.xml",
-        "2024-01-01T00:45:00+00:00",
-    )
-
-    assert result == {"https://example.com/new": "URL_UPDATED"}
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-01T01:00:00+00:00"
-    )
-
-
-def test_add_entries_compares_fractional_seconds(monkeypatch):
-    sitemap = {
-        "urlset": {
-            "url": [
-                {
-                    "loc": "https://example.com/new",
-                    "lastmod": "2024-01-01T00:00:00.000001+00:00",
-                },
-                {
-                    "loc": "https://example.com/same",
-                    "lastmod": "2024-01-01T00:00:00.000000+00:00",
-                },
-            ]
-        }
-    }
-
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url, timeout: _Response("<xml />"),
-    )
-    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
-
-    result, newest_submitted_at = submit_urls.add_entries(
-        "https://example.com/sitemap.xml",
-        "2024-01-01T00:00:00+00:00",
-    )
-
-    assert result == {"https://example.com/new": "URL_UPDATED"}
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-01T00:00:00.000001+00:00"
-    )
-
-
-def test_add_entries_tracks_max_lastmod_independent_of_order(monkeypatch):
-    sitemap = {
-        "urlset": {
-            "url": [
-                {
-                    "loc": "https://example.com/second",
-                    "lastmod": "2024-01-02T00:00:00+00:00",
-                },
-                {
-                    "loc": "https://example.com/first",
-                    "lastmod": "2024-01-05T00:00:00+00:00",
-                },
-                {
-                    "loc": "https://example.com/old",
-                    "lastmod": "2024-01-01T00:00:00+00:00",
-                },
-            ]
-        }
-    }
-
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url, timeout: _Response("<xml />"),
-    )
-    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
-
-    result, newest_submitted_at = submit_urls.add_entries(
-        "https://example.com/sitemap.xml",
-        "2024-01-01T12:00:00+00:00",
-    )
-
-    assert result == {
-        "https://example.com/second": "URL_UPDATED",
-        "https://example.com/first": "URL_UPDATED",
-    }
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-05T00:00:00+00:00"
-    )
-
-
-def test_add_entries_returns_none_when_nothing_is_new(monkeypatch):
-    sitemap = {
-        "urlset": {
-            "url": [
-                {
-                    "loc": "https://example.com/current",
-                    "lastmod": "2024-01-01T00:00:00+00:00",
-                }
-            ]
-        }
-    }
-
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url, timeout: _Response("<xml />"),
-    )
-    monkeypatch.setattr(submit_urls.xmltodict, "parse", lambda text: sitemap)
-
-    result, newest_submitted_at = submit_urls.add_entries(
-        "https://example.com/sitemap.xml",
-        "2024-01-01T00:00:00+00:00",
-    )
-
-    assert result == {}
-    assert newest_submitted_at is None
-
-
-def test_add_entries_raises_on_http_error(monkeypatch):
+def test_get_sitemap_entries_raises_on_http_error(monkeypatch):
     error = submit_urls.requests.exceptions.RequestException("bad response")
 
     class _ErrorResponse:
@@ -245,13 +102,10 @@ def test_add_entries_raises_on_http_error(monkeypatch):
         submit_urls.requests.exceptions.RequestException,
         match="bad response",
     ):
-        submit_urls.add_entries(
-            "https://example.com/sitemap.xml",
-            "2024-01-01T00:00:00+00:00",
-        )
+        submit_urls.get_sitemap_entries("https://example.com/sitemap.xml")
 
 
-def test_add_entries_raises_on_http_timeout(monkeypatch):
+def test_get_sitemap_entries_raises_on_http_timeout(monkeypatch):
     error = submit_urls.requests.exceptions.RequestException("timed out")
 
     def fake_get(url, timeout):
@@ -263,32 +117,10 @@ def test_add_entries_raises_on_http_timeout(monkeypatch):
         submit_urls.requests.exceptions.RequestException,
         match="timed out",
     ):
-        submit_urls.add_entries(
-            "https://example.com/sitemap.xml",
-            "2024-01-01T00:00:00+00:00",
-        )
+        submit_urls.get_sitemap_entries("https://example.com/sitemap.xml")
 
 
-def test_add_entries_raises_for_malformed_sitemap(monkeypatch):
-    monkeypatch.setattr(
-        submit_urls.requests,
-        "get",
-        lambda url, timeout: _Response("<xml />"),
-    )
-    monkeypatch.setattr(
-        submit_urls.xmltodict,
-        "parse",
-        lambda text: {"urlset": {"url": [{"loc": "https://example.com"}]}},
-    )
-
-    with pytest.raises(ValueError, match="missing 'loc' or 'lastmod'"):
-        submit_urls.add_entries(
-            "https://example.com/sitemap.xml",
-            "2024-01-01T00:00:00+00:00",
-        )
-
-
-def test_add_entries_propagates_xml_parse_error(monkeypatch):
+def test_get_sitemap_entries_propagates_xml_parse_error(monkeypatch):
     monkeypatch.setattr(
         submit_urls.requests,
         "get",
@@ -301,8 +133,98 @@ def test_add_entries_propagates_xml_parse_error(monkeypatch):
     monkeypatch.setattr(submit_urls.xmltodict, "parse", fail_parse)
 
     with pytest.raises(ExpatError, match="not well-formed"):
-        submit_urls.add_entries(
-            "https://example.com/sitemap.xml",
+        submit_urls.get_sitemap_entries("https://example.com/sitemap.xml")
+
+
+def test_get_updated_entries_compares_timezone_aware_datetimes():
+    result, newest_submitted_at = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/not-new",
+                "lastmod": "2024-01-01T00:30:00+00:00",
+            },
+            {
+                "loc": "https://example.com/new",
+                "lastmod": "2024-01-01T00:00:00-01:00",
+            },
+        ],
+        "2024-01-01T00:45:00+00:00",
+    )
+
+    assert result == {"https://example.com/new": "URL_UPDATED"}
+    assert newest_submitted_at == submit_urls.parse_timestamp(
+        "2024-01-01T01:00:00+00:00"
+    )
+
+
+def test_get_updated_entries_compares_fractional_seconds():
+    result, newest_submitted_at = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/new",
+                "lastmod": "2024-01-01T00:00:00.000001+00:00",
+            },
+            {
+                "loc": "https://example.com/same",
+                "lastmod": "2024-01-01T00:00:00.000000+00:00",
+            },
+        ],
+        "2024-01-01T00:00:00+00:00",
+    )
+
+    assert result == {"https://example.com/new": "URL_UPDATED"}
+    assert newest_submitted_at == submit_urls.parse_timestamp(
+        "2024-01-01T00:00:00.000001+00:00"
+    )
+
+
+def test_get_updated_entries_tracks_max_lastmod_independent_of_order():
+    result, newest_submitted_at = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/second",
+                "lastmod": "2024-01-02T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/first",
+                "lastmod": "2024-01-05T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/old",
+                "lastmod": "2024-01-01T00:00:00+00:00",
+            },
+        ],
+        "2024-01-01T12:00:00+00:00",
+    )
+
+    assert result == {
+        "https://example.com/second": "URL_UPDATED",
+        "https://example.com/first": "URL_UPDATED",
+    }
+    assert newest_submitted_at == submit_urls.parse_timestamp(
+        "2024-01-05T00:00:00+00:00"
+    )
+
+
+def test_get_updated_entries_returns_none_when_nothing_is_new():
+    result, newest_submitted_at = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/current",
+                "lastmod": "2024-01-01T00:00:00+00:00",
+            }
+        ],
+        "2024-01-01T00:00:00+00:00",
+    )
+
+    assert result == {}
+    assert newest_submitted_at is None
+
+
+def test_get_updated_entries_raises_for_malformed_sitemap():
+    with pytest.raises(ValueError, match="missing 'loc' or 'lastmod'"):
+        submit_urls.get_updated_entries(
+            [{"loc": "https://example.com"}],
             "2024-01-01T00:00:00+00:00",
         )
 
@@ -673,8 +595,13 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     )
     monkeypatch.setattr(
         submit_urls,
-        "add_entries",
-        lambda sitemap_url, last_submitted: (
+        "get_sitemap_entries",
+        lambda sitemap_url: [{"loc": "https://example.com/a"}],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_updated_entries",
+        lambda url_items, last_submitted: (
             {"https://example.com/a": "URL_UPDATED"},
             submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
         ),
@@ -729,13 +656,18 @@ def test_main_persists_successful_provider_on_partial_failure(
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
 
-    add_entries_calls = []
+    checkpoint_calls = []
+    sitemap_calls = []
     google_submissions = []
     bing_submissions = []
     state = {"run": 0}
 
-    def fake_add_entries(sitemap_url, last_submitted):
-        add_entries_calls.append(last_submitted)
+    def fake_get_sitemap_entries(sitemap_url):
+        sitemap_calls.append(sitemap_url)
+        return [{"loc": "https://example.com/a"}]
+
+    def fake_get_updated_entries(url_items, last_submitted):
+        checkpoint_calls.append(last_submitted)
         if state["run"] == 0:
             return (
                 {"https://example.com/a": "URL_UPDATED"},
@@ -772,7 +704,16 @@ def test_main_persists_successful_provider_on_partial_failure(
         "get_config_path",
         lambda path: str(config_path),
     )
-    monkeypatch.setattr(submit_urls, "add_entries", fake_add_entries)
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        fake_get_sitemap_entries,
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_updated_entries",
+        fake_get_updated_entries,
+    )
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
@@ -820,7 +761,11 @@ def test_main_persists_successful_provider_on_partial_failure(
         ["https://example.com/a"],
         ["https://example.com/a"],
     ]
-    assert add_entries_calls == [
+    assert sitemap_calls == [
+        "https://example.com/sitemap.xml",
+        "https://example.com/sitemap.xml",
+    ]
+    assert checkpoint_calls == [
         "2024-01-01T00:00:00+00:00",
         "2024-01-01T00:00:00+00:00",
         "2024-01-02T00:00:00+00:00",
@@ -871,10 +816,14 @@ def test_main_fails_fast_before_network_on_invalid_config(
         lambda path: str(config_path),
     )
 
-    def fail_add_entries(*args, **kwargs):
-        raise AssertionError("add_entries should not be called")
+    def fail_get_sitemap_entries(*args, **kwargs):
+        raise AssertionError("get_sitemap_entries should not be called")
 
-    monkeypatch.setattr(submit_urls, "add_entries", fail_add_entries)
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        fail_get_sitemap_entries,
+    )
 
     with pytest.raises(
         submit_urls.SubmissionError, match="default placeholder value"
@@ -921,8 +870,13 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
     )
     monkeypatch.setattr(
         submit_urls,
-        "add_entries",
-        lambda sitemap_url, last_submitted: (
+        "get_sitemap_entries",
+        lambda sitemap_url: [{"loc": "https://example.com/a"}],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_updated_entries",
+        lambda url_items, last_submitted: (
             {"https://example.com/a": "URL_UPDATED"},
             submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
         ),
@@ -985,8 +939,16 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         submit_urls,
-        "add_entries",
-        lambda sitemap_url, last_submitted: (
+        "get_sitemap_entries",
+        lambda sitemap_url: [
+            {"loc": "https://example.com/a"},
+            {"loc": "https://example.com/b"},
+        ],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_updated_entries",
+        lambda url_items, last_submitted: (
             {
                 "https://example.com/a": "URL_UPDATED",
                 "https://example.com/b": "URL_UPDATED",
@@ -1072,7 +1034,7 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
 
     state = {"run": 0}
 
-    def fake_add_entries(sitemap_url, last_submitted):
+    def fake_get_updated_entries(url_items, last_submitted):
         state["run"] += 1
         if state["run"] == 1:
             assert last_submitted == "2024-01-01T00:00:00+00:00"
@@ -1101,7 +1063,16 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
         "get_config_path",
         lambda path: str(config_path),
     )
-    monkeypatch.setattr(submit_urls, "add_entries", fake_add_entries)
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: [{"loc": "https://example.com/a"}],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_updated_entries",
+        fake_get_updated_entries,
+    )
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
