@@ -61,7 +61,7 @@ file with your own:
 Then, execute:
 
 ``` shell
-submit_urls.py
+./submit_urls.py
 ```
 
 ### Options
