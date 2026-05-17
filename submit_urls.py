@@ -12,11 +12,11 @@ import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import gnupg
 import requests
 import xmltodict
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 from core_utilities import config_io
 from core_utilities import file_utilities
@@ -282,7 +282,11 @@ def submit_urls_to_google(key_dictionary, url_list):
             )
         )
 
-    batch.execute()
+    try:
+        batch.execute()
+    except Exception as e:
+        print(e)
+        raise SubmissionError("Google submission failed.") from e
     if errors:
         raise SubmissionError("Google submission failed.")
 

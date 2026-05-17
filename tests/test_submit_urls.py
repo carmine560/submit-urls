@@ -448,6 +448,47 @@ def test_submit_urls_to_google_raises_on_batch_error(monkeypatch, capsys):
     assert "google failed" in capsys.readouterr().out
 
 
+def test_submit_urls_to_google_raises_on_batch_execute_error(
+    monkeypatch, capsys
+):
+    class _Batch:
+        def add(self, item):
+            self.item = item
+
+        def execute(self):
+            raise RuntimeError("execute failed")
+
+    class _Notifications:
+        def publish(self, body):
+            return body
+
+    class _Service:
+        def new_batch_http_request(self, callback):
+            return _Batch()
+
+        def urlNotifications(self):
+            return _Notifications()
+
+    monkeypatch.setattr(
+        submit_urls.service_account.Credentials,
+        "from_service_account_info",
+        lambda info, scopes: {"info": info, "scopes": scopes},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "build",
+        lambda api, version, credentials: _Service(),
+    )
+
+    with pytest.raises(submit_urls.SubmissionError, match="Google"):
+        submit_urls.submit_urls_to_google(
+            {"client_email": "demo@example.com"},
+            {"https://example.com/a": "URL_UPDATED"},
+        )
+
+    assert "execute failed" in capsys.readouterr().out
+
+
 def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
     called = {}
 
