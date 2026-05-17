@@ -503,6 +503,30 @@ def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
     assert "request failed" in capsys.readouterr().out
 
 
+def test_submit_urls_to_bing_raises_on_invalid_json(monkeypatch, capsys):
+    class _PostResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            raise ValueError("invalid json")
+
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "post",
+        lambda url, data, headers, timeout: _PostResponse(),
+    )
+
+    with pytest.raises(submit_urls.SubmissionError, match="Bing"):
+        submit_urls.submit_urls_to_bing(
+            "secret",
+            "https://example.com",
+            ["https://example.com/a"],
+        )
+
+    assert "invalid json" in capsys.readouterr().out
+
+
 def test_submit_urls_to_bing_raises_on_timeout(monkeypatch, capsys):
     error = submit_urls.requests.exceptions.RequestException("timed out")
 
