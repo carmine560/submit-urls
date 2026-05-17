@@ -2,8 +2,6 @@
 
 """Synchronize sitemap URLs with the Google and Bing indices."""
 
-from datetime import datetime, timezone
-from urllib.parse import urlparse
 import argparse
 import configparser
 import io
@@ -11,18 +9,20 @@ import json
 import os
 import pprint
 import sys
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import gnupg
 import requests
 import xmltodict
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 from core_utilities import config_io
 from core_utilities import file_utilities
 
-HTTP_TIMEOUT_SECONDS = 10
 DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
+HTTP_TIMEOUT_SECONDS = 10
 PROVIDER_SECTIONS = ("Google", "Bing")
 
 
@@ -356,6 +356,10 @@ def main():
     config = configure(config_path)
     validate_config(config)
     enabled_sections = get_enabled_provider_sections(config)
+    if not enabled_sections:
+        config_io.write_config(config, config_path)
+        return
+
     url_items = get_sitemap_entries(config["Common"]["sitemap_url"])
     provider_updates = {}
     preview_urls = {}

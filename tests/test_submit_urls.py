@@ -1,7 +1,7 @@
 """Tests for the sitemap and submission workflow."""
 
-import json
 import configparser
+import json
 from types import SimpleNamespace
 from xml.parsers.expat import ExpatError
 
@@ -829,6 +829,60 @@ def test_main_fails_fast_before_network_on_invalid_config(
         submit_urls.SubmissionError, match="default placeholder value"
     ):
         submit_urls.main()
+
+
+def test_main_skips_sitemap_fetch_when_no_providers_enabled(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "0",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+
+    def fail_get_sitemap_entries(*args, **kwargs):
+        raise AssertionError("get_sitemap_entries should not be called")
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        fail_get_sitemap_entries,
+    )
+
+    submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-01T00:00:00+00:00"
+    )
 
 
 def test_main_does_not_update_last_submitted_on_decrypt_failure(
