@@ -13,6 +13,14 @@ from core_utilities import config_validation
 from core_utilities.config_common import ConfigError
 
 
+def _completed_process(returncode=0, stdout=b"", stderr=b""):
+    return SimpleNamespace(
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
 def test_write_and_read_config_round_trip(tmp_path):
     config_path = tmp_path / "settings.ini"
     written = configparser.ConfigParser()
@@ -47,7 +55,7 @@ def test_write_config_keeps_existing_file_when_replace_fails(
     assert not list(tmp_path.glob(".settings.ini.*.tmp"))
 
 
-def test_write_and_read_config_round_trip_encrypted(tmp_path):
+def test_write_and_read_config_round_trip_encrypted(tmp_path, monkeypatch):
     config_path = tmp_path / "settings.ini"
     written = configparser.ConfigParser()
     written["General"] = {
@@ -55,6 +63,28 @@ def test_write_and_read_config_round_trip_encrypted(tmp_path):
         "enabled": "true",
         "name": "demo",
     }
+    encrypted = b"encrypted config"
+
+    def run_gpg(args, input=None, stdout=None, stderr=None, check=False):
+        if "--encrypt" in args:
+            assert input is not None
+            return _completed_process(stdout=encrypted)
+        if "--decrypt" in args:
+            assert args[-1] == f"{config_path}.gpg"
+            assert (tmp_path / "settings.ini.gpg").read_bytes() == encrypted
+            return _completed_process(stdout=input_config_bytes)
+        raise AssertionError(args)
+
+    input_config = configparser.ConfigParser()
+    input_config["General"] = {
+        "fingerprint": "stub",
+        "enabled": "true",
+        "name": "demo",
+    }
+    input_config_string = config_io.StringIO()
+    input_config.write(input_config_string)
+    input_config_bytes = input_config_string.getvalue().encode("utf-8")
+    monkeypatch.setattr(config_io.subprocess, "run", run_gpg)
 
     config_io.write_config(written, config_path, is_encrypted=True)
 
@@ -82,6 +112,11 @@ def test_write_config_encrypted_keeps_existing_file_when_replace_fails(
         raise OSError("replace failed")
 
     monkeypatch.setattr(config_io.os, "replace", fail_replace)
+    monkeypatch.setattr(
+        config_io.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(stdout=b"encrypted"),
+    )
 
     with pytest.raises(OSError, match="replace failed"):
         config_io.write_config(written, config_path, is_encrypted=True)
@@ -95,11 +130,14 @@ def test_read_config_encrypted_raises_on_failed_decrypt(tmp_path, monkeypatch):
     encrypted_path = tmp_path / "settings.ini.gpg"
     encrypted_path.write_bytes(b"ciphertext")
 
-    class _GPG:
-        def decrypt(self, data):
-            return SimpleNamespace(ok=False, status="bad passphrase", data=b"")
-
-    monkeypatch.setattr(config_io.gnupg, "GPG", _GPG)
+    monkeypatch.setattr(
+        config_io.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            returncode=2,
+            stderr=b"bad passphrase",
+        ),
+    )
 
     with pytest.raises(
         ConfigError,
@@ -117,11 +155,11 @@ def test_read_config_encrypted_raises_on_empty_decrypt_data(
     encrypted_path = tmp_path / "settings.ini.gpg"
     encrypted_path.write_bytes(b"ciphertext")
 
-    class _GPG:
-        def decrypt(self, data):
-            return SimpleNamespace(ok=True, status="", data=b"")
-
-    monkeypatch.setattr(config_io.gnupg, "GPG", _GPG)
+    monkeypatch.setattr(
+        config_io.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(),
+    )
 
     with pytest.raises(
         ConfigError,

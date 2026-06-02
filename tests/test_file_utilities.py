@@ -28,8 +28,12 @@ def _backup_name(timestamp):
     )
 
 
-def _decrypt_result(data):
-    return SimpleNamespace(ok=True, status="", data=data)
+def _completed_process(returncode=0, stdout=b"", stderr=b""):
+    return SimpleNamespace(
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
 
 
 def test_archive_encrypt_directory_raises_when_no_gpg_keys(
@@ -38,15 +42,18 @@ def test_archive_encrypt_directory_raises_when_no_gpg_keys(
     source = tmp_path / "source"
     source.mkdir()
 
-    class _Gpg:
-        def list_keys(self):
-            return []
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            returncode=2,
+            stderr=b"No usable GPG keys found.",
+        ),
+    )
 
     with pytest.raises(
         file_utilities.UtilityOperationError,
-        match="No usable GPG keys found.",
+        match="GPG encryption failed: No usable GPG keys found.",
     ):
         file_utilities.archive_encrypt_directory(str(source), str(tmp_path))
 
@@ -57,15 +64,18 @@ def test_archive_encrypt_directory_raises_when_gpg_key_has_no_fingerprint(
     source = tmp_path / "source"
     source.mkdir()
 
-    class _Gpg:
-        def list_keys(self):
-            return [{}]
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            returncode=2,
+            stderr=b"GPG key has no fingerprint.",
+        ),
+    )
 
     with pytest.raises(
         file_utilities.UtilityOperationError,
-        match="GPG key has no fingerprint.",
+        match="GPG encryption failed: GPG key has no fingerprint.",
     ):
         file_utilities.archive_encrypt_directory(str(source), str(tmp_path))
 
@@ -158,11 +168,13 @@ def test_decrypt_extract_file_raises_when_archive_is_empty(
         pass
     tar_stream.seek(0)
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _decrypt_result(tar_stream.getvalue())
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            stdout=tar_stream.getvalue()
+        ),
+    )
 
     with pytest.raises(
         file_utilities.UtilityOperationError,
@@ -189,11 +201,13 @@ def test_decrypt_extract_file_rejects_parent_directory_member(
         tar.addfile(file_info, io.BytesIO(b"attack"))
     tar_stream.seek(0)
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _decrypt_result(tar_stream.getvalue())
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            stdout=tar_stream.getvalue()
+        ),
+    )
 
     with pytest.raises(ValueError, match=r"\.\./escape.txt"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
@@ -217,11 +231,13 @@ def test_decrypt_extract_file_rejects_absolute_member(tmp_path, monkeypatch):
         tar.addfile(file_info, io.BytesIO(b"attack"))
     tar_stream.seek(0)
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _decrypt_result(tar_stream.getvalue())
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            stdout=tar_stream.getvalue()
+        ),
+    )
 
     with pytest.raises(ValueError, match="/tmp/escape.txt"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
@@ -249,11 +265,13 @@ def test_decrypt_extract_file_rejects_special_member(
         tar.addfile(special_info)
     tar_stream.seek(0)
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _decrypt_result(tar_stream.getvalue())
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            stdout=tar_stream.getvalue()
+        ),
+    )
 
     with pytest.raises(ValueError, match="archive-root/special"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
@@ -279,11 +297,13 @@ def test_decrypt_extract_file_raises_when_output_file_blocks_directory(
         tar.addfile(file_info)
     tar_stream.seek(0)
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _decrypt_result(tar_stream.getvalue())
-
-    monkeypatch.setattr(file_utilities.gnupg, "GPG", lambda: _Gpg())
+    monkeypatch.setattr(
+        file_utilities.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            stdout=tar_stream.getvalue()
+        ),
+    )
 
     with pytest.raises(FileExistsError, match="archive-root file exists"):
         file_utilities.decrypt_extract_file(str(source), str(output_directory))
