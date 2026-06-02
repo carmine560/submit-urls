@@ -37,34 +37,6 @@ def _install_googleapiclient_stubs():
     sys.modules["googleapiclient.discovery"] = discovery
 
 
-def _install_gnupg_stub():
-    gnupg = ModuleType("gnupg")
-
-    class _GPG:
-        def decrypt(self, data):
-            return SimpleNamespace(data=data)
-
-        def decrypt_file(self, handle):
-            return SimpleNamespace(data=handle.read())
-
-        def encrypt(self, data, fingerprint, armor=False):
-            return SimpleNamespace(ok=True, data=data.encode(), status="")
-
-        def encrypt_file(self, source, fingerprint, armor=False, output=None):
-            return SimpleNamespace(
-                ok=True,
-                data=b"",
-                status="",
-                output=output,
-            )
-
-        def list_keys(self):
-            return [{"fingerprint": "stub"}]
-
-    gnupg.GPG = _GPG
-    sys.modules["gnupg"] = gnupg
-
-
 def _install_requests_stub():
     requests = ModuleType("requests")
 
@@ -108,8 +80,6 @@ if "google.oauth2.service_account" not in sys.modules:
     _install_google_stubs()
 if "googleapiclient.discovery" not in sys.modules:
     _install_googleapiclient_stubs()
-if "gnupg" not in sys.modules:
-    _install_gnupg_stub()
 if "requests" not in sys.modules:
     _install_requests_stub()
 if "xmltodict" not in sys.modules:

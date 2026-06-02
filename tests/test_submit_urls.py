@@ -18,23 +18,46 @@ class _Response:
         return None
 
 
-class _DecryptResult:
-    def __init__(self, data=b"", ok=True, status=""):
-        self.data = data
-        self.ok = ok
-        self.status = status
+def _completed_process(returncode=0, stdout=b"", stderr=b""):
+    return SimpleNamespace(
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
 
 
-def test_decrypt_data_returns_decrypted_bytes(tmp_path):
+def test_decrypt_data_returns_decrypted_bytes(tmp_path, monkeypatch):
     secret_path = tmp_path / "secret.bin"
     secret_path.write_bytes(b"payload")
+    calls = []
 
-    def fake_decrypt(file_object):
-        return _DecryptResult(data=file_object.read(), ok=True)
+    def fake_run(args, stdout, stderr, check):
+        calls.append(
+            {
+                "args": args,
+                "stdout": stdout,
+                "stderr": stderr,
+                "check": check,
+            }
+        )
+        return _completed_process(stdout=b"payload")
 
-    assert (
-        submit_urls._decrypt_data(str(secret_path), fake_decrypt) == b"payload"
-    )
+    monkeypatch.setattr(submit_urls.subprocess, "run", fake_run)
+    assert submit_urls._decrypt_data(str(secret_path)) == b"payload"
+    assert calls == [
+        {
+            "args": [
+                "gpg",
+                "--batch",
+                "--yes",
+                "--decrypt",
+                str(secret_path),
+            ],
+            "stdout": submit_urls.subprocess.PIPE,
+            "stderr": submit_urls.subprocess.PIPE,
+            "check": False,
+        }
+    ]
 
 
 def test_parse_timestamp_normalizes_z_suffix():
@@ -586,39 +609,51 @@ def test_submit_urls_to_bing_raises_on_timeout(monkeypatch, capsys):
     assert "timed out" in capsys.readouterr().out
 
 
-def test_load_google_key_raises_on_failed_decrypt(tmp_path):
+def test_load_google_key_raises_on_failed_decrypt(tmp_path, monkeypatch):
     key_path = tmp_path / "key.json.gpg"
     key_path.write_bytes(b"encrypted")
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _DecryptResult(ok=False, status="bad decrypt")
+    monkeypatch.setattr(
+        submit_urls.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(
+            returncode=2,
+            stderr=b"bad decrypt",
+        ),
+    )
 
-    with pytest.raises(submit_urls.SubmissionError, match="bad decrypt"):
-        submit_urls.load_google_key(str(key_path), _Gpg())
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="GPG decryption failed: bad decrypt",
+    ):
+        submit_urls.load_google_key(str(key_path))
 
 
-def test_load_google_key_raises_on_invalid_json(tmp_path):
+def test_load_google_key_raises_on_invalid_json(tmp_path, monkeypatch):
     key_path = tmp_path / "key.json.gpg"
     key_path.write_bytes(b"encrypted")
 
-    class _Gpg:
-        def decrypt_file(self, file_object):
-            return _DecryptResult(data=b"not json")
+    monkeypatch.setattr(
+        submit_urls.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(stdout=b"not json"),
+    )
 
     with pytest.raises(submit_urls.SubmissionError, match="valid JSON"):
-        submit_urls.load_google_key(str(key_path), _Gpg())
+        submit_urls.load_google_key(str(key_path))
 
 
-def test_load_bing_api_key_returns_stripped_text(tmp_path):
+def test_load_bing_api_key_returns_stripped_text(tmp_path, monkeypatch):
     key_path = tmp_path / "key.txt.gpg"
     key_path.write_bytes(b"encrypted")
 
-    class _Gpg:
-        def decrypt(self, data):
-            return _DecryptResult(data=b"secret-key \n")
+    monkeypatch.setattr(
+        submit_urls.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(stdout=b"secret-key \n"),
+    )
 
-    assert submit_urls.load_bing_api_key(str(key_path), _Gpg()) == "secret-key"
+    assert submit_urls.load_bing_api_key(str(key_path)) == "secret-key"
 
 
 def test_main_does_not_update_last_submitted_on_google_failure(
@@ -674,7 +709,7 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
-        lambda path, gpg: {"client_email": "demo@example.com"},
+        lambda path: {"client_email": "demo@example.com"},
     )
     monkeypatch.setattr(
         submit_urls,
@@ -683,8 +718,6 @@ def test_main_does_not_update_last_submitted_on_google_failure(
             submit_urls.SubmissionError("Google submission failed.")
         ),
     )
-    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
-
     with pytest.raises(
         submit_urls.SubmissionError, match="Google submission failed."
     ):
@@ -782,7 +815,7 @@ def test_main_persists_successful_provider_on_partial_failure(
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
-        lambda path, gpg: {"client_email": "demo@example.com"},
+        lambda path: {"client_email": "demo@example.com"},
     )
     monkeypatch.setattr(
         submit_urls,
@@ -792,15 +825,13 @@ def test_main_persists_successful_provider_on_partial_failure(
     monkeypatch.setattr(
         submit_urls,
         "load_bing_api_key",
-        lambda path, gpg: "secret",
+        lambda path: "secret",
     )
     monkeypatch.setattr(
         submit_urls,
         "submit_urls_to_bing",
         fake_submit_bing,
     )
-    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
-
     with pytest.raises(
         submit_urls.SubmissionError, match="Bing submission failed."
     ):
@@ -1003,11 +1034,10 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
-        lambda path, gpg: (_ for _ in ()).throw(
+        lambda path: (_ for _ in ()).throw(
             submit_urls.SubmissionError("bad decrypt")
         ),
     )
-    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
 
     with pytest.raises(submit_urls.SubmissionError, match="bad decrypt"):
         submit_urls.main()
@@ -1078,7 +1108,7 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
-        lambda path, gpg: {"client_email": "demo@example.com"},
+        lambda path: {"client_email": "demo@example.com"},
     )
     monkeypatch.setattr(
         submit_urls,
@@ -1088,15 +1118,13 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     monkeypatch.setattr(
         submit_urls,
         "load_bing_api_key",
-        lambda path, gpg: "secret",
+        lambda path: "secret",
     )
     monkeypatch.setattr(
         submit_urls,
         "submit_urls_to_bing",
         lambda api_key, site_url, url_list: None,
     )
-    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
-
     monkeypatch.setattr(
         submit_urls,
         "datetime",
@@ -1195,14 +1223,13 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
     monkeypatch.setattr(
         submit_urls,
         "load_google_key",
-        lambda path, gpg: {"client_email": "demo@example.com"},
+        lambda path: {"client_email": "demo@example.com"},
     )
     monkeypatch.setattr(
         submit_urls,
         "submit_urls_to_google",
         lambda key_dictionary, url_list: None,
     )
-    monkeypatch.setattr(submit_urls.gnupg, "GPG", lambda: object())
     monkeypatch.setattr(
         submit_urls,
         "datetime",

@@ -8,11 +8,11 @@ import io
 import json
 import os
 import pprint
+import subprocess
 import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-import gnupg
 import requests
 import xmltodict
 from google.oauth2 import service_account
@@ -182,44 +182,44 @@ def get_updated_entries(url_items, last_submitted):
 # Secret Loading
 
 
-def _decrypt_data(path, decrypt_function):
+def _decrypt_data(path):
     """Decrypt and validate secret data loaded from a file."""
-    with open(path, "rb") as f:
-        decrypted = decrypt_function(f)
-
-    if not getattr(decrypted, "ok", bool(getattr(decrypted, "data", b""))):
-        status = getattr(decrypted, "status", "decryption failed")
-        raise SubmissionError(status)
-    if not decrypted.data:
+    try:
+        decrypted = subprocess.run(
+            [
+                "gpg",
+                "--batch",
+                "--yes",
+                "--decrypt",
+                path,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError as e:
+        raise SubmissionError(f"Unable to run gpg: {e}") from e
+    if decrypted.returncode:
+        status = decrypted.stderr.decode("utf-8", errors="replace").strip()
+        if not status:
+            status = f"gpg exited with status {decrypted.returncode}"
+        raise SubmissionError(f"GPG decryption failed: {status}")
+    if not decrypted.stdout:
         raise SubmissionError("Decryption returned no data.")
-    return decrypted.data
+    return decrypted.stdout
 
 
-def load_google_key(path, gpg):
+def load_google_key(path):
     """Load and validate the decrypted Google service account JSON."""
     try:
-        return json.load(
-            io.BytesIO(
-                _decrypt_data(
-                    path,
-                    lambda file_object: gpg.decrypt_file(file_object),
-                )
-            )
-        )
+        return json.load(io.BytesIO(_decrypt_data(path)))
     except json.JSONDecodeError as e:
         raise SubmissionError("Google key is not valid JSON.") from e
 
 
-def load_bing_api_key(path, gpg):
+def load_bing_api_key(path):
     """Load and validate the decrypted Bing API key."""
-    return (
-        _decrypt_data(
-            path,
-            lambda file_object: gpg.decrypt(file_object.read()),
-        )
-        .decode()
-        .strip()
-    )
+    return _decrypt_data(path).decode().strip()
 
 
 # Submission
@@ -383,14 +383,11 @@ def main():
         pprint.pprint(preview_urls)
         return
 
-    gpg = gnupg.GPG()
     google_url_list, google_newest_submitted_at = provider_updates.get(
         "Google", ({}, None)
     )
     if google_url_list:
-        key_dictionary = load_google_key(
-            config["Google"]["json_key_path"], gpg
-        )
+        key_dictionary = load_google_key(config["Google"]["json_key_path"])
         submit_urls_to_google(key_dictionary, google_url_list)
         config["Google"][
             "last_submitted"
@@ -402,7 +399,7 @@ def main():
         "Bing", ({}, None)
     )
     if bing_url_list:
-        api_key = load_bing_api_key(config["Bing"]["api_key_path"], gpg)
+        api_key = load_bing_api_key(config["Bing"]["api_key_path"])
         parsed_url = urlparse(config["Common"]["sitemap_url"])
         submit_urls_to_bing(
             api_key,
