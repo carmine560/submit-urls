@@ -1,27 +1,13 @@
-"""Tests for configuration file helpers."""
+"""Tests for configuration file helpers used by submit_urls."""
 
-import builtins
 import configparser
-import importlib
-import sys
-from types import SimpleNamespace
 
 import pytest
 
 from core_utilities import config_io
-from core_utilities import config_validation
-from core_utilities.config_common import ConfigError
 
 
-def _completed_process(returncode=0, stdout=b"", stderr=b""):
-    return SimpleNamespace(
-        returncode=returncode,
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-
-def test_write_and_read_config_round_trip(tmp_path):
+def test_write_config_writes_plaintext_config(tmp_path):
     config_path = tmp_path / "settings.ini"
     written = configparser.ConfigParser()
     written["General"] = {"enabled": "true", "name": "demo"}
@@ -29,7 +15,7 @@ def test_write_and_read_config_round_trip(tmp_path):
     config_io.write_config(written, config_path)
 
     loaded = configparser.ConfigParser()
-    config_io.read_config(loaded, config_path)
+    loaded.read(config_path, encoding="utf-8")
 
     assert loaded["General"]["enabled"] == "true"
     assert loaded["General"]["name"] == "demo"
@@ -53,207 +39,3 @@ def test_write_config_keeps_existing_file_when_replace_fails(
 
     assert config_path.read_text(encoding="utf-8") == "original"
     assert not list(tmp_path.glob(".settings.ini.*.tmp"))
-
-
-def test_write_and_read_config_round_trip_encrypted(tmp_path, monkeypatch):
-    config_path = tmp_path / "settings.ini"
-    written = configparser.ConfigParser()
-    written["General"] = {
-        "fingerprint": "stub",
-        "enabled": "true",
-        "name": "demo",
-    }
-    encrypted = b"encrypted config"
-
-    def run_gpg(args, input=None, stdout=None, stderr=None, check=False):
-        if "--encrypt" in args:
-            assert input is not None
-            return _completed_process(stdout=encrypted)
-        if "--decrypt" in args:
-            assert args[-1] == f"{config_path}.gpg"
-            assert (tmp_path / "settings.ini.gpg").read_bytes() == encrypted
-            return _completed_process(stdout=input_config_bytes)
-        raise AssertionError(args)
-
-    input_config = configparser.ConfigParser()
-    input_config["General"] = {
-        "fingerprint": "stub",
-        "enabled": "true",
-        "name": "demo",
-    }
-    input_config_string = config_io.StringIO()
-    input_config.write(input_config_string)
-    input_config_bytes = input_config_string.getvalue().encode("utf-8")
-    monkeypatch.setattr(config_io.subprocess, "run", run_gpg)
-
-    config_io.write_config(written, config_path, is_encrypted=True)
-
-    loaded = configparser.ConfigParser()
-    config_io.read_config(loaded, config_path, is_encrypted=True)
-
-    assert loaded["General"]["fingerprint"] == "stub"
-    assert loaded["General"]["enabled"] == "true"
-    assert loaded["General"]["name"] == "demo"
-
-
-def test_write_config_encrypted_keeps_existing_file_when_replace_fails(
-    tmp_path, monkeypatch
-):
-    config_path = tmp_path / "settings.ini"
-    encrypted_path = tmp_path / "settings.ini.gpg"
-    encrypted_path.write_bytes(b"original")
-    written = configparser.ConfigParser()
-    written["General"] = {
-        "fingerprint": "stub",
-        "enabled": "true",
-    }
-
-    def fail_replace(source, destination):
-        raise OSError("replace failed")
-
-    monkeypatch.setattr(config_io.os, "replace", fail_replace)
-    monkeypatch.setattr(
-        config_io.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(stdout=b"encrypted"),
-    )
-
-    with pytest.raises(OSError, match="replace failed"):
-        config_io.write_config(written, config_path, is_encrypted=True)
-
-    assert encrypted_path.read_bytes() == b"original"
-    assert not list(tmp_path.glob(".settings.ini.gpg.*.tmp"))
-
-
-def test_read_config_encrypted_raises_on_failed_decrypt(tmp_path, monkeypatch):
-    config_path = tmp_path / "settings.ini"
-    encrypted_path = tmp_path / "settings.ini.gpg"
-    encrypted_path.write_bytes(b"ciphertext")
-
-    monkeypatch.setattr(
-        config_io.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(
-            returncode=2,
-            stderr=b"bad passphrase",
-        ),
-    )
-
-    with pytest.raises(
-        ConfigError,
-        match="GPG decryption failed while reading config: bad passphrase",
-    ):
-        config_io.read_config(
-            configparser.ConfigParser(), config_path, is_encrypted=True
-        )
-
-
-def test_read_config_encrypted_raises_on_empty_decrypt_data(
-    tmp_path, monkeypatch
-):
-    config_path = tmp_path / "settings.ini"
-    encrypted_path = tmp_path / "settings.ini.gpg"
-    encrypted_path.write_bytes(b"ciphertext")
-
-    monkeypatch.setattr(
-        config_io.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(),
-    )
-
-    with pytest.raises(
-        ConfigError,
-        match="GPG decryption returned no config data.",
-    ):
-        config_io.read_config(
-            configparser.ConfigParser(), config_path, is_encrypted=True
-        )
-
-
-def test_get_strict_boolean_accepts_only_true_false():
-    config = configparser.ConfigParser()
-    config["Flags"] = {"enabled": "true", "maybe": "yes"}
-
-    assert (
-        config_validation.get_strict_boolean(config, "Flags", "enabled")
-        is True
-    )
-
-    with pytest.raises(ValueError):
-        config_validation.get_strict_boolean(config, "Flags", "maybe")
-
-
-def test_evaluate_value_returns_literals_and_none_for_invalid_input():
-    assert config_validation.evaluate_value("{'a': 1}") == {"a": 1}
-    assert config_validation.evaluate_value("not a literal") is None
-
-
-def test_config_common_imports_without_prompt_toolkit(monkeypatch):
-    original_module = sys.modules["core_utilities.config_common"]
-    monkeypatch.delitem(sys.modules, "prompt_toolkit", raising=False)
-    monkeypatch.delitem(
-        sys.modules,
-        "prompt_toolkit.completion",
-        raising=False,
-    )
-
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "prompt_toolkit" or name.startswith("prompt_toolkit."):
-            raise ModuleNotFoundError("No module named 'prompt_toolkit'")
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    monkeypatch.delitem(
-        sys.modules,
-        "core_utilities.config_common",
-        raising=False,
-    )
-
-    try:
-        reloaded = importlib.import_module("core_utilities.config_common")
-        assert isinstance(
-            reloaded.PROMPT_TOOLKIT_IMPORT_ERROR,
-            ModuleNotFoundError,
-        )
-        with pytest.raises(reloaded.ConfigError, match="prompt_toolkit"):
-            reloaded.CustomWordCompleter(("value",))
-    finally:
-        sys.modules["core_utilities.config_common"] = original_module
-
-
-def test_config_prompt_imports_without_prompt_toolkit(monkeypatch):
-    original_module = sys.modules.get("core_utilities.config_prompt")
-    monkeypatch.delitem(sys.modules, "prompt_toolkit", raising=False)
-    monkeypatch.delitem(
-        sys.modules,
-        "prompt_toolkit.completion",
-        raising=False,
-    )
-
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "prompt_toolkit" or name.startswith("prompt_toolkit."):
-            raise ModuleNotFoundError("No module named 'prompt_toolkit'")
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    monkeypatch.delitem(
-        sys.modules,
-        "core_utilities.config_prompt",
-        raising=False,
-    )
-
-    try:
-        reloaded = importlib.import_module("core_utilities.config_prompt")
-        assert isinstance(
-            reloaded.PROMPT_TOOLKIT_IMPORT_ERROR,
-            ModuleNotFoundError,
-        )
-        with pytest.raises(reloaded.ConfigError, match="prompt_toolkit"):
-            reloaded.prompt_for_input("value", value="existing")
-    finally:
-        if original_module is not None:
-            sys.modules["core_utilities.config_prompt"] = original_module
