@@ -30,13 +30,13 @@ cd submit-urls
 # '--recurse-submodules'.
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install -r requirements.txt -U
+python -m pip install -r requirements.txt -c constraints.txt
 ```
 
 ## Run Tests (Optional)
 
 ``` shell
-python -m pip install -r requirements-dev.txt -U
+python -m pip install -r requirements-dev.txt -c constraints.txt
 pytest
 ```
 
