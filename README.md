@@ -13,10 +13,12 @@ the [Bing Webmaster API](https://docs.microsoft.com/en-us/bingwebmaster/).
 `submit_urls.py` has been tested for Blogger on Debian Testing on WSL 2 and
 requires the following packages:
 
-  * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client/)
-    to access Google APIs
   * [GnuPG](https://gnupg.org/index.html) to decrypt your encrypted JSON key
     file and API key file for authorization
+  * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client/)
+    to access Google APIs
+  * [`requests`](https://requests.readthedocs.io/en/latest/) to fetch the
+    sitemap and submit URLs through the Bing Webmaster API
   * [`xmltodict`](https://github.com/martinblech/xmltodict) to convert the
     sitemap to a dictionary
 

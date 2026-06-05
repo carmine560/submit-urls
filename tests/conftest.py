@@ -1,7 +1,7 @@
 """Test fixtures and dependency stubs for optional imports."""
 
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,24 +37,6 @@ def _install_googleapiclient_stubs():
     sys.modules["googleapiclient.discovery"] = discovery
 
 
-def _install_requests_stub():
-    requests = ModuleType("requests")
-
-    class _RequestException(Exception):
-        pass
-
-    requests.get = lambda *args, **kwargs: None
-    requests.post = lambda *args, **kwargs: None
-    requests.exceptions = SimpleNamespace(RequestException=_RequestException)
-    sys.modules["requests"] = requests
-
-
-def _install_xmltodict_stub():
-    xmltodict = ModuleType("xmltodict")
-    xmltodict.parse = lambda text: {}
-    sys.modules["xmltodict"] = xmltodict
-
-
 def _install_prompt_toolkit_stubs():
     prompt_toolkit = ModuleType("prompt_toolkit")
     prompt_toolkit.ANSI = lambda value: value
@@ -80,10 +62,6 @@ if "google.oauth2.service_account" not in sys.modules:
     _install_google_stubs()
 if "googleapiclient.discovery" not in sys.modules:
     _install_googleapiclient_stubs()
-if "requests" not in sys.modules:
-    _install_requests_stub()
-if "xmltodict" not in sys.modules:
-    _install_xmltodict_stub()
 if "prompt_toolkit" not in sys.modules:
     _install_prompt_toolkit_stubs()
 
