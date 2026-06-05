@@ -354,7 +354,8 @@ def main():
     """Parse arguments, configure settings, and submit URLs."""
     args = get_arguments()
 
-    file_utilities.create_launchers_exit(args, __file__)
+    if file_utilities.create_launchers_exit(args, __file__):
+        return
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)

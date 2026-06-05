@@ -656,6 +656,71 @@ def test_load_bing_api_key_returns_stripped_text(tmp_path, monkeypatch):
     assert submit_urls.load_bing_api_key(str(key_path)) == "secret-key"
 
 
+def test_main_returns_after_launcher_creation(monkeypatch):
+    args = SimpleNamespace(n=False, BS=True)
+    launcher_calls = []
+
+    monkeypatch.setattr(submit_urls, "get_arguments", lambda: args)
+
+    def fake_create_launchers_exit(received_args, script_path):
+        launcher_calls.append((received_args, script_path))
+        return True
+
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        fake_create_launchers_exit,
+    )
+
+    def fail_get_config_path(*args, **kwargs):
+        raise AssertionError("get_config_path should not be called")
+
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        fail_get_config_path,
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("get_sitemap_entries should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("load_google_key should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("submit_urls_to_google should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_bing_api_key",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("load_bing_api_key should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_bing",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("submit_urls_to_bing should not be called")
+        ),
+    )
+
+    submit_urls.main()
+
+    assert launcher_calls == [(args, submit_urls.__file__)]
+
+
 def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch, tmp_path
 ):
