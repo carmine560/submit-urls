@@ -167,9 +167,10 @@ def get_sitemap_entries(sitemap_url):
     return url_items
 
 
-def get_updated_entries(url_items, last_submitted):
+def get_updated_entries(url_items, last_submitted, last_submitted_url=""):
     """Extract updated URLs newer than the given checkpoint."""
     last_submitted_at = parse_timestamp(last_submitted)
+    last_submitted_checkpoint = (last_submitted_at, last_submitted_url)
     newer = []
     for item in url_items:
         if not isinstance(item, dict):
@@ -182,7 +183,11 @@ def get_updated_entries(url_items, last_submitted):
                 "Sitemap URL entry is missing 'loc' or 'lastmod'."
             )
         lastmod_at = parse_timestamp(lastmod)
-        if lastmod_at > last_submitted_at:
+        if last_submitted_url:
+            is_newer = (lastmod_at, loc) > last_submitted_checkpoint
+        else:
+            is_newer = lastmod_at > last_submitted_at
+        if is_newer:
             newer.append((lastmod_at, loc))
 
     # Sort first by lastmod_at. If two entries have the same timestamp, sort by
@@ -267,11 +272,34 @@ def sync_common_last_submitted(config):
     if not enabled_sections:
         return
 
-    common_last_submitted = min(
-        parse_timestamp(get_provider_last_submitted(config, section))
-        for section in enabled_sections
+    provider_checkpoints = []
+    for section in enabled_sections:
+        provider_last_submitted = config.get(
+            section, "last_submitted", fallback=""
+        ).strip()
+        if provider_last_submitted:
+            last_submitted_url = config.get(
+                section, "last_submitted_url", fallback=""
+            ).strip()
+        else:
+            last_submitted_url = config.get(
+                "Common", "last_submitted_url", fallback=""
+            ).strip()
+        provider_checkpoints.append(
+            (
+                parse_timestamp(get_provider_last_submitted(config, section)),
+                last_submitted_url,
+            )
+        )
+
+    common_last_submitted, common_last_submitted_url = min(
+        provider_checkpoints
     )
     config["Common"]["last_submitted"] = common_last_submitted.isoformat()
+    if common_last_submitted_url:
+        config["Common"]["last_submitted_url"] = common_last_submitted_url
+    else:
+        config["Common"].pop("last_submitted_url", None)
 
 
 def submit_urls_to_google(key_dictionary, url_list):
@@ -389,6 +417,7 @@ def submit_provider_updates(config, config_path, provider_updates):
                 {url: "URL_UPDATED" for _, url in chunk},
             )
             config["Google"]["last_submitted"] = chunk[-1][0].isoformat()
+            config["Google"]["last_submitted_url"] = chunk[-1][1]
             sync_common_last_submitted(config)
             config_io.write_config(config, config_path)
 
@@ -405,6 +434,7 @@ def submit_provider_updates(config, config_path, provider_updates):
                 [url for _, url in chunk],
             )
             config["Bing"]["last_submitted"] = chunk[-1][0].isoformat()
+            config["Bing"]["last_submitted_url"] = chunk[-1][1]
             sync_common_last_submitted(config)
             config_io.write_config(config, config_path)
 
@@ -435,9 +465,21 @@ def main():
     preview_urls = {}
     for section in enabled_sections:
         try:
+            provider_last_submitted = config.get(
+                section, "last_submitted", fallback=""
+            ).strip()
+            if provider_last_submitted:
+                last_submitted_url = config.get(
+                    section, "last_submitted_url", fallback=""
+                ).strip()
+            else:
+                last_submitted_url = config.get(
+                    "Common", "last_submitted_url", fallback=""
+                ).strip()
             url_list = get_updated_entries(
                 url_items,
                 get_provider_last_submitted(config, section),
+                last_submitted_url,
             )
         except ValueError as e:
             raise SubmissionError(f"Invalid sitemap: {e}") from e
