@@ -511,6 +511,43 @@ def test_submit_urls_to_google_raises_on_batch_error(monkeypatch, capsys):
     assert "google failed" in capsys.readouterr().out
 
 
+def test_submit_urls_to_google_raises_on_malformed_service_account():
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Google client setup failed"
+    ) as exc_info:
+        submit_urls.submit_urls_to_google(
+            {},
+            {"https://example.com/a": "URL_UPDATED"},
+        )
+
+    assert exc_info.value.__cause__ is not None
+
+
+def test_submit_urls_to_google_raises_on_client_build_error(monkeypatch):
+    monkeypatch.setattr(
+        submit_urls.service_account.Credentials,
+        "from_service_account_info",
+        lambda info, scopes: {"info": info, "scopes": scopes},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "build",
+        lambda api, version, credentials: (_ for _ in ()).throw(
+            RuntimeError("build failed")
+        ),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Google client setup failed"
+    ) as exc_info:
+        submit_urls.submit_urls_to_google(
+            {"client_email": "demo@example.com"},
+            {"https://example.com/a": "URL_UPDATED"},
+        )
+
+    assert "build failed" in str(exc_info.value.__cause__)
+
+
 def test_submit_urls_to_google_raises_on_batch_execute_error(
     monkeypatch, capsys
 ):

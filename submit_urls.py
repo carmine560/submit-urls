@@ -314,11 +314,14 @@ def submit_urls_to_google(key_dictionary, url_list):
         else:
             print(response)
 
-    credentials = service_account.Credentials.from_service_account_info(
-        key_dictionary, scopes=["https://www.googleapis.com/auth/indexing"]
-    )
-    service = build("indexing", "v3", credentials=credentials)
-    batch = service.new_batch_http_request(callback=handle_response)
+    try:
+        credentials = service_account.Credentials.from_service_account_info(
+            key_dictionary, scopes=["https://www.googleapis.com/auth/indexing"]
+        )
+        service = build("indexing", "v3", credentials=credentials)
+        batch = service.new_batch_http_request(callback=handle_response)
+    except Exception as e:
+        raise SubmissionError("Google client setup failed.") from e
 
     for url, api_type in url_list.items():
         batch.add(
