@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 
 from core_utilities import file_utilities
 
@@ -43,3 +45,44 @@ def test_get_config_path_falls_back_to_dot_config_when_xdg_unset(
         "project",
         "tool.ini",
     )
+
+
+def test_archive_encrypt_directory_raises_on_gpg_timeout(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "data.txt").write_text("payload", encoding="utf-8")
+
+    def timeout_run(*args, **kwargs):
+        raise file_utilities.subprocess.TimeoutExpired(
+            args[0],
+            kwargs["timeout"],
+        )
+
+    monkeypatch.setattr(file_utilities.subprocess, "run", timeout_run)
+
+    with pytest.raises(
+        file_utilities.UtilityOperationError,
+        match="GPG encryption timed out",
+    ):
+        file_utilities.archive_encrypt_directory(str(source), str(tmp_path))
+
+
+def test_decrypt_extract_file_raises_on_gpg_timeout(tmp_path, monkeypatch):
+    source = tmp_path / "source.tar.xz.gpg"
+    source.write_bytes(b"encrypted")
+
+    def timeout_run(*args, **kwargs):
+        raise file_utilities.subprocess.TimeoutExpired(
+            args[0],
+            kwargs["timeout"],
+        )
+
+    monkeypatch.setattr(file_utilities.subprocess, "run", timeout_run)
+
+    with pytest.raises(
+        file_utilities.UtilityOperationError,
+        match="GPG decryption timed out",
+    ):
+        file_utilities.decrypt_extract_file(str(source), str(tmp_path))

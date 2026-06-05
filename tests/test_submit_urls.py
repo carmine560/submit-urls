@@ -35,13 +35,14 @@ def test_decrypt_data_returns_decrypted_bytes(tmp_path, monkeypatch):
     secret_path.write_bytes(b"payload")
     calls = []
 
-    def fake_run(args, stdout, stderr, check):
+    def fake_run(args, stdout, stderr, check, timeout):
         calls.append(
             {
                 "args": args,
                 "stdout": stdout,
                 "stderr": stderr,
                 "check": check,
+                "timeout": timeout,
             }
         )
         return _completed_process(stdout=b"payload")
@@ -60,6 +61,7 @@ def test_decrypt_data_returns_decrypted_bytes(tmp_path, monkeypatch):
             "stdout": submit_urls.subprocess.PIPE,
             "stderr": submit_urls.subprocess.PIPE,
             "check": False,
+            "timeout": submit_urls.GPG_TIMEOUT_SECONDS,
         }
     ]
 
@@ -675,6 +677,22 @@ def test_load_google_key_raises_on_failed_decrypt(tmp_path, monkeypatch):
     with pytest.raises(
         submit_urls.SubmissionError,
         match="GPG decryption failed: bad decrypt",
+    ):
+        submit_urls.load_google_key(str(key_path))
+
+
+def test_load_google_key_raises_on_decrypt_timeout(tmp_path, monkeypatch):
+    key_path = tmp_path / "key.json.gpg"
+    key_path.write_bytes(b"encrypted")
+
+    def timeout_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+
+    monkeypatch.setattr(submit_urls.subprocess, "run", timeout_run)
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="GPG decryption timed out",
     ):
         submit_urls.load_google_key(str(key_path))
 

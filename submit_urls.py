@@ -24,6 +24,7 @@ from core_utilities import file_utilities
 
 DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
 HTTP_TIMEOUT_SECONDS = 10
+GPG_TIMEOUT_SECONDS = 30
 GOOGLE_BATCH_SIZE = 100
 BING_BATCH_SIZE = 500
 PROVIDER_SECTIONS = ("Google", "Bing")
@@ -207,7 +208,12 @@ def _decrypt_data(path):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
+            timeout=GPG_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as e:
+        raise SubmissionError(
+            f"GPG decryption timed out after {GPG_TIMEOUT_SECONDS} seconds."
+        ) from e
     except OSError as e:
         raise SubmissionError(f"Unable to run gpg: {e}") from e
     if decrypted.returncode:
