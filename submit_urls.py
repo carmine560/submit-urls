@@ -98,7 +98,7 @@ def validate_secret_path(path, option_name):
         )
 
 
-def validate_config(config):
+def validate_config(config, validate_secrets=True):
     """Validate config values before network or GPG work begins."""
     sitemap_url = get_required_option(config, "Common", "sitemap_url")
     validate_url(sitemap_url, "Common.sitemap_url")
@@ -112,13 +112,17 @@ def validate_config(config):
             "timestamp."
         ) from e
 
-    if get_required_boolean_option(config, "Google", "can_submit"):
+    google_can_submit = get_required_boolean_option(
+        config, "Google", "can_submit"
+    )
+    if validate_secrets and google_can_submit:
         google_key_path = get_required_option(
             config, "Google", "json_key_path"
         )
         validate_secret_path(google_key_path, "Google.json_key_path")
 
-    if get_required_boolean_option(config, "Bing", "can_submit"):
+    bing_can_submit = get_required_boolean_option(config, "Bing", "can_submit")
+    if validate_secrets and bing_can_submit:
         bing_key_path = get_required_option(config, "Bing", "api_key_path")
         validate_secret_path(bing_key_path, "Bing.api_key_path")
 
@@ -369,7 +373,7 @@ def main():
 
     config_path = file_utilities.get_config_path(__file__)
     config = configure(config_path)
-    validate_config(config)
+    validate_config(config, validate_secrets=not args.n)
     enabled_sections = get_enabled_provider_sections(config)
     if not enabled_sections:
         config_io.write_config(config, config_path)

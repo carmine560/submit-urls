@@ -761,6 +761,87 @@ def test_main_returns_after_launcher_creation(monkeypatch):
     assert launcher_calls == [(args, submit_urls.__file__)]
 
 
+def test_main_dry_run_allows_missing_provider_secret_files(
+    monkeypatch, tmp_path, capsys
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=True),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: [
+            {
+                "loc": "https://example.com/a",
+                "lastmod": "2024-01-02T00:00:00+00:00",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("load_google_key should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_bing_api_key",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("load_bing_api_key should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("submit_urls_to_google should not be called")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_bing",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("submit_urls_to_bing should not be called")
+        ),
+    )
+
+    submit_urls.main()
+
+    assert capsys.readouterr().out == (
+        "{'https://example.com/a': 'URL_UPDATED'}\n"
+    )
+
+
 def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch, tmp_path
 ):
