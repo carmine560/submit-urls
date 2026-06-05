@@ -2,6 +2,10 @@
 
 import configparser
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 from xml.parsers.expat import ExpatError
 
@@ -840,6 +844,191 @@ def test_main_dry_run_allows_missing_provider_secret_files(
     assert capsys.readouterr().out == (
         "{'https://example.com/a': 'URL_UPDATED'}\n"
     )
+
+
+def test_main_wraps_sitemap_fetch_error(monkeypatch, tmp_path):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    error = submit_urls.requests.exceptions.RequestException("timed out")
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=True),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Unable to fetch sitemap"
+    ) as exc_info:
+        submit_urls.main()
+
+    assert exc_info.value.__cause__ is error
+
+
+def test_main_wraps_xml_parse_error(monkeypatch, tmp_path):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    error = ExpatError("not well-formed")
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=True),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="Unable to parse sitemap XML"
+    ) as exc_info:
+        submit_urls.main()
+
+    assert exc_info.value.__cause__ is error
+
+
+def test_main_wraps_malformed_sitemap_error(monkeypatch, tmp_path):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=True),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: [{"loc": "https://example.com/a"}],
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError, match="missing 'loc' or 'lastmod'"
+    ) as exc_info:
+        submit_urls.main()
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+
+
+def test_cli_reports_submission_error_without_traceback(tmp_path):
+    config_dir = tmp_path / "xdg-config" / "submit-urls"
+    config_dir.mkdir(parents=True)
+    config_path = config_dir / "submit_urls.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    env = os.environ.copy()
+    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg-config")
+    completed = subprocess.run(
+        [sys.executable, str(Path(submit_urls.__file__))],
+        cwd=Path(submit_urls.__file__).parent,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert completed.stdout == ""
+    assert "Configured file 'Google.json_key_path' does not exist" in (
+        completed.stderr
+    )
+    assert "Traceback" not in completed.stderr
 
 
 def test_main_does_not_update_last_submitted_on_google_failure(

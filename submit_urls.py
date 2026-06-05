@@ -12,6 +12,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from xml.parsers.expat import ExpatError
 
 import requests
 import xmltodict
@@ -379,14 +380,25 @@ def main():
         config_io.write_config(config, config_path)
         return
 
-    url_items = get_sitemap_entries(config["Common"]["sitemap_url"])
+    try:
+        url_items = get_sitemap_entries(config["Common"]["sitemap_url"])
+    except requests.exceptions.RequestException as e:
+        raise SubmissionError(f"Unable to fetch sitemap: {e}") from e
+    except ExpatError as e:
+        raise SubmissionError(f"Unable to parse sitemap XML: {e}") from e
+    except ValueError as e:
+        raise SubmissionError(f"Invalid sitemap: {e}") from e
+
     provider_updates = {}
     preview_urls = {}
     for section in enabled_sections:
-        url_list, newest_submitted_at = get_updated_entries(
-            url_items,
-            get_provider_last_submitted(config, section),
-        )
+        try:
+            url_list, newest_submitted_at = get_updated_entries(
+                url_items,
+                get_provider_last_submitted(config, section),
+            )
+        except ValueError as e:
+            raise SubmissionError(f"Invalid sitemap: {e}") from e
         provider_updates[section] = (url_list, newest_submitted_at)
         preview_urls.update(url_list)
 
@@ -431,3 +443,6 @@ if __name__ == "__main__":
         main()
     except ConfigCreated:
         sys.exit()
+    except SubmissionError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
