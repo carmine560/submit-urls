@@ -24,7 +24,13 @@ from core_utilities import file_utilities
 
 DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
 HTTP_TIMEOUT_SECONDS = 10
+GOOGLE_BATCH_SIZE = 100
+BING_BATCH_SIZE = 500
 PROVIDER_SECTIONS = ("Google", "Bing")
+SITEMAP_ERROR_MESSAGES = {
+    ExpatError: "Unable to parse sitemap XML",
+    ValueError: "Invalid sitemap",
+}
 
 
 class SubmissionError(Exception):
@@ -161,10 +167,9 @@ def get_sitemap_entries(sitemap_url):
 
 
 def get_updated_entries(url_items, last_submitted):
-    """Extract updated URLs and the newest submitted timestamp."""
+    """Extract updated URLs newer than the given checkpoint."""
     last_submitted_at = parse_timestamp(last_submitted)
-    newer = {}
-    newest_submitted_at = None
+    newer = []
     for item in url_items:
         if not isinstance(item, dict):
             raise ValueError("Sitemap URL entry must be a mapping.")
@@ -177,11 +182,12 @@ def get_updated_entries(url_items, last_submitted):
             )
         lastmod_at = parse_timestamp(lastmod)
         if lastmod_at > last_submitted_at:
-            newer[loc] = "URL_UPDATED"
-            if newest_submitted_at is None or lastmod_at > newest_submitted_at:
-                newest_submitted_at = lastmod_at
+            newer.append((lastmod_at, loc))
 
-    return newer, newest_submitted_at
+    # Sort first by lastmod_at. If two entries have the same timestamp, sort by
+    # loc.
+    newer.sort(key=lambda entry: (entry[0], entry[1]))
+    return newer
 
 
 # Secret Loading
@@ -365,6 +371,38 @@ def configure(config_path):
     raise ConfigCreated
 
 
+def submit_provider_updates(config, config_path, provider_updates):
+    """Submit provider URL updates and persist successful chunk checkpoints."""
+    google_entries = provider_updates.get("Google", [])
+    if google_entries:
+        key_dictionary = load_google_key(config["Google"]["json_key_path"])
+        for i in range(0, len(google_entries), GOOGLE_BATCH_SIZE):
+            chunk = google_entries[i : i + GOOGLE_BATCH_SIZE]
+            submit_urls_to_google(
+                key_dictionary,
+                {url: "URL_UPDATED" for _, url in chunk},
+            )
+            config["Google"]["last_submitted"] = chunk[-1][0].isoformat()
+            sync_common_last_submitted(config)
+            config_io.write_config(config, config_path)
+
+    bing_entries = provider_updates.get("Bing", [])
+    if bing_entries:
+        api_key = load_bing_api_key(config["Bing"]["api_key_path"])
+        parsed_url = urlparse(config["Common"]["sitemap_url"])
+        site_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        for i in range(0, len(bing_entries), BING_BATCH_SIZE):
+            chunk = bing_entries[i : i + BING_BATCH_SIZE]
+            submit_urls_to_bing(
+                api_key,
+                site_url,
+                [url for _, url in chunk],
+            )
+            config["Bing"]["last_submitted"] = chunk[-1][0].isoformat()
+            sync_common_last_submitted(config)
+            config_io.write_config(config, config_path)
+
+
 def main():
     """Parse arguments, configure settings, and submit URLs."""
     args = get_arguments()
@@ -384,23 +422,21 @@ def main():
         url_items = get_sitemap_entries(config["Common"]["sitemap_url"])
     except requests.exceptions.RequestException as e:
         raise SubmissionError(f"Unable to fetch sitemap: {e}") from e
-    except ExpatError as e:
-        raise SubmissionError(f"Unable to parse sitemap XML: {e}") from e
-    except ValueError as e:
-        raise SubmissionError(f"Invalid sitemap: {e}") from e
+    except (ExpatError, ValueError) as e:
+        raise SubmissionError(f"{SITEMAP_ERROR_MESSAGES[type(e)]}: {e}") from e
 
     provider_updates = {}
     preview_urls = {}
     for section in enabled_sections:
         try:
-            url_list, newest_submitted_at = get_updated_entries(
+            url_list = get_updated_entries(
                 url_items,
                 get_provider_last_submitted(config, section),
             )
         except ValueError as e:
             raise SubmissionError(f"Invalid sitemap: {e}") from e
-        provider_updates[section] = (url_list, newest_submitted_at)
-        preview_urls.update(url_list)
+        provider_updates[section] = url_list
+        preview_urls.update({url: "URL_UPDATED" for _, url in url_list})
 
     if not preview_urls:
         sync_common_last_submitted(config)
@@ -410,32 +446,7 @@ def main():
         pprint.pprint(preview_urls)
         return
 
-    google_url_list, google_newest_submitted_at = provider_updates.get(
-        "Google", ({}, None)
-    )
-    if google_url_list:
-        key_dictionary = load_google_key(config["Google"]["json_key_path"])
-        submit_urls_to_google(key_dictionary, google_url_list)
-        config["Google"][
-            "last_submitted"
-        ] = google_newest_submitted_at.isoformat()
-        sync_common_last_submitted(config)
-        config_io.write_config(config, config_path)
-
-    bing_url_list, bing_newest_submitted_at = provider_updates.get(
-        "Bing", ({}, None)
-    )
-    if bing_url_list:
-        api_key = load_bing_api_key(config["Bing"]["api_key_path"])
-        parsed_url = urlparse(config["Common"]["sitemap_url"])
-        submit_urls_to_bing(
-            api_key,
-            f"{parsed_url.scheme}://{parsed_url.netloc}",
-            list(bing_url_list.keys()),
-        )
-        config["Bing"]["last_submitted"] = bing_newest_submitted_at.isoformat()
-        sync_common_last_submitted(config)
-        config_io.write_config(config, config_path)
+    submit_provider_updates(config, config_path, provider_updates)
 
 
 if __name__ == "__main__":

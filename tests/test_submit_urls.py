@@ -164,7 +164,7 @@ def test_get_sitemap_entries_propagates_xml_parse_error(monkeypatch):
 
 
 def test_get_updated_entries_compares_timezone_aware_datetimes():
-    result, newest_submitted_at = submit_urls.get_updated_entries(
+    result = submit_urls.get_updated_entries(
         [
             {
                 "loc": "https://example.com/not-new",
@@ -178,14 +178,16 @@ def test_get_updated_entries_compares_timezone_aware_datetimes():
         "2024-01-01T00:45:00+00:00",
     )
 
-    assert result == {"https://example.com/new": "URL_UPDATED"}
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-01T01:00:00+00:00"
-    )
+    assert result == [
+        (
+            submit_urls.parse_timestamp("2024-01-01T01:00:00+00:00"),
+            "https://example.com/new",
+        )
+    ]
 
 
 def test_get_updated_entries_compares_fractional_seconds():
-    result, newest_submitted_at = submit_urls.get_updated_entries(
+    result = submit_urls.get_updated_entries(
         [
             {
                 "loc": "https://example.com/new",
@@ -199,14 +201,16 @@ def test_get_updated_entries_compares_fractional_seconds():
         "2024-01-01T00:00:00+00:00",
     )
 
-    assert result == {"https://example.com/new": "URL_UPDATED"}
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-01T00:00:00.000001+00:00"
-    )
+    assert result == [
+        (
+            submit_urls.parse_timestamp("2024-01-01T00:00:00.000001+00:00"),
+            "https://example.com/new",
+        )
+    ]
 
 
 def test_get_updated_entries_tracks_max_lastmod_independent_of_order():
-    result, newest_submitted_at = submit_urls.get_updated_entries(
+    result = submit_urls.get_updated_entries(
         [
             {
                 "loc": "https://example.com/second",
@@ -224,17 +228,20 @@ def test_get_updated_entries_tracks_max_lastmod_independent_of_order():
         "2024-01-01T12:00:00+00:00",
     )
 
-    assert result == {
-        "https://example.com/second": "URL_UPDATED",
-        "https://example.com/first": "URL_UPDATED",
-    }
-    assert newest_submitted_at == submit_urls.parse_timestamp(
-        "2024-01-05T00:00:00+00:00"
-    )
+    assert result == [
+        (
+            submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+            "https://example.com/second",
+        ),
+        (
+            submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
+            "https://example.com/first",
+        ),
+    ]
 
 
 def test_get_updated_entries_returns_none_when_nothing_is_new():
-    result, newest_submitted_at = submit_urls.get_updated_entries(
+    result = submit_urls.get_updated_entries(
         [
             {
                 "loc": "https://example.com/current",
@@ -244,8 +251,7 @@ def test_get_updated_entries_returns_none_when_nothing_is_new():
         "2024-01-01T00:00:00+00:00",
     )
 
-    assert result == {}
-    assert newest_submitted_at is None
+    assert result == []
 
 
 def test_get_updated_entries_raises_for_malformed_sitemap():
@@ -1076,10 +1082,12 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch.setattr(
         submit_urls,
         "get_updated_entries",
-        lambda url_items, last_submitted: (
-            {"https://example.com/a": "URL_UPDATED"},
-            submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
-        ),
+        lambda url_items, last_submitted: [
+            (
+                submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+                "https://example.com/a",
+            )
+        ],
     )
     monkeypatch.setattr(
         submit_urls,
@@ -1142,16 +1150,20 @@ def test_main_persists_successful_provider_on_partial_failure(
     def fake_get_updated_entries(url_items, last_submitted):
         checkpoint_calls.append(last_submitted)
         if state["run"] == 0:
-            return (
-                {"https://example.com/a": "URL_UPDATED"},
-                submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
-            )
+            return [
+                (
+                    submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+                    "https://example.com/a",
+                )
+            ]
         if last_submitted == "2024-01-02T00:00:00+00:00":
-            return ({}, None)
-        return (
-            {"https://example.com/a": "URL_UPDATED"},
-            submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
-        )
+            return []
+        return [
+            (
+                submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+                "https://example.com/a",
+            )
+        ]
 
     def fake_submit_google(key_dictionary, url_list):
         google_submissions.append(dict(url_list))
@@ -1248,6 +1260,192 @@ def test_main_persists_successful_provider_on_partial_failure(
     assert reloaded["Bing"]["last_submitted"] == ("2024-01-02T00:00:00+00:00")
     assert reloaded["Common"]["last_submitted"] == (
         "2024-01-02T00:00:00+00:00"
+    )
+
+
+def test_main_persists_google_checkpoint_after_successful_chunk(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(google_key),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    submissions = []
+
+    def fake_submit_google(key_dictionary, url_list):
+        submissions.append(dict(url_list))
+        if len(submissions) == 2:
+            raise submit_urls.SubmissionError("Google chunk failed.")
+
+    monkeypatch.setattr(submit_urls, "GOOGLE_BATCH_SIZE", 2)
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: [
+            {
+                "loc": "https://example.com/c",
+                "lastmod": "2024-01-04T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/a",
+                "lastmod": "2024-01-02T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/b",
+                "lastmod": "2024-01-03T00:00:00+00:00",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path: {"client_email": "demo@example.com"},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        fake_submit_google,
+    )
+
+    with pytest.raises(submit_urls.SubmissionError, match="Google chunk"):
+        submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert submissions == [
+        {
+            "https://example.com/a": "URL_UPDATED",
+            "https://example.com/b": "URL_UPDATED",
+        },
+        {"https://example.com/c": "URL_UPDATED"},
+    ]
+    assert reloaded["Google"]["last_submitted"] == (
+        "2024-01-03T00:00:00+00:00"
+    )
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-03T00:00:00+00:00"
+    )
+
+
+def test_main_persists_bing_checkpoint_after_successful_chunk(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    bing_key = tmp_path / "bing.txt.gpg"
+    bing_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "0",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": str(bing_key),
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    submissions = []
+
+    def fake_submit_bing(api_key, site_url, url_list):
+        submissions.append((site_url, list(url_list)))
+        if len(submissions) == 2:
+            raise submit_urls.SubmissionError("Bing chunk failed.")
+
+    monkeypatch.setattr(submit_urls, "BING_BATCH_SIZE", 2)
+    monkeypatch.setattr(
+        submit_urls,
+        "get_arguments",
+        lambda: SimpleNamespace(n=False),
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "create_launchers_exit",
+        lambda args, path: None,
+    )
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "get_sitemap_entries",
+        lambda sitemap_url: [
+            {
+                "loc": "https://example.com/c",
+                "lastmod": "2024-01-04T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/a",
+                "lastmod": "2024-01-02T00:00:00+00:00",
+            },
+            {
+                "loc": "https://example.com/b",
+                "lastmod": "2024-01-03T00:00:00+00:00",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "load_bing_api_key",
+        lambda path: "secret",
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_bing",
+        fake_submit_bing,
+    )
+
+    with pytest.raises(submit_urls.SubmissionError, match="Bing chunk"):
+        submit_urls.main()
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert submissions == [
+        (
+            "https://example.com",
+            ["https://example.com/a", "https://example.com/b"],
+        ),
+        ("https://example.com", ["https://example.com/c"]),
+    ]
+    assert reloaded["Bing"]["last_submitted"] == ("2024-01-03T00:00:00+00:00")
+    assert reloaded["Common"]["last_submitted"] == (
+        "2024-01-03T00:00:00+00:00"
     )
 
 
@@ -1402,8 +1600,12 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
         submit_urls,
         "get_updated_entries",
         lambda url_items, last_submitted: (
-            {"https://example.com/a": "URL_UPDATED"},
-            submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+            [
+                (
+                    submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00"),
+                    "https://example.com/a",
+                )
+            ]
         ),
     )
     monkeypatch.setattr(
@@ -1473,11 +1675,16 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
         submit_urls,
         "get_updated_entries",
         lambda url_items, last_submitted: (
-            {
-                "https://example.com/a": "URL_UPDATED",
-                "https://example.com/b": "URL_UPDATED",
-            },
-            submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
+            [
+                (
+                    submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
+                    "https://example.com/a",
+                ),
+                (
+                    submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
+                    "https://example.com/b",
+                ),
+            ]
         ),
     )
     monkeypatch.setattr(
@@ -1560,15 +1767,19 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
         state["run"] += 1
         if state["run"] == 1:
             assert last_submitted == "2024-01-01T00:00:00+00:00"
-            return (
-                {"https://example.com/a": "URL_UPDATED"},
-                submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
-            )
+            return [
+                (
+                    submit_urls.parse_timestamp("2024-01-05T00:00:00+00:00"),
+                    "https://example.com/a",
+                )
+            ]
         assert last_submitted == "2024-01-05T00:00:00+00:00"
-        return (
-            {"https://example.com/b": "URL_UPDATED"},
-            submit_urls.parse_timestamp("2024-01-07T00:00:00+00:00"),
-        )
+        return [
+            (
+                submit_urls.parse_timestamp("2024-01-07T00:00:00+00:00"),
+                "https://example.com/b",
+            )
+        ]
 
     monkeypatch.setattr(
         submit_urls,
