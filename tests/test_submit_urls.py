@@ -564,7 +564,11 @@ def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
             ["https://example.com/a"],
         )
 
-    assert "request failed" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Bing submission failed" in output
+    assert "RequestException" in output
+    assert "apikey=<redacted>" in output
+    assert "secret" not in output
 
 
 def test_submit_urls_to_bing_raises_on_invalid_json(monkeypatch, capsys):
@@ -588,7 +592,11 @@ def test_submit_urls_to_bing_raises_on_invalid_json(monkeypatch, capsys):
             ["https://example.com/a"],
         )
 
-    assert "invalid json" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Bing submission failed" in output
+    assert "ValueError" in output
+    assert "apikey=<redacted>" in output
+    assert "secret" not in output
 
 
 def test_submit_urls_to_bing_raises_on_timeout(monkeypatch, capsys):
@@ -606,7 +614,39 @@ def test_submit_urls_to_bing_raises_on_timeout(monkeypatch, capsys):
             ["https://example.com/a"],
         )
 
-    assert "timed out" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Bing submission failed" in output
+    assert "RequestException" in output
+    assert "apikey=<redacted>" in output
+    assert "secret" not in output
+
+
+def test_submit_urls_to_bing_redacts_api_key_from_failure_output(
+    monkeypatch, capsys
+):
+    error = submit_urls.requests.exceptions.RequestException(
+        "failed for https://ssl.bing.com/webmaster/api.svc/json/"
+        "SubmitUrlBatch?apikey=secret"
+    )
+
+    def fake_post(url, data, headers, timeout):
+        raise error
+
+    monkeypatch.setattr(submit_urls.requests, "post", fake_post)
+
+    with pytest.raises(submit_urls.SubmissionError) as exc_info:
+        submit_urls.submit_urls_to_bing(
+            "secret",
+            "https://example.com",
+            ["https://example.com/a"],
+        )
+
+    output = capsys.readouterr().out
+    assert "Bing submission failed" in output
+    assert "apikey=<redacted>" in output
+    assert "secret" not in output
+    assert "secret" not in str(exc_info.value)
+    assert exc_info.value.__cause__ is None
 
 
 def test_load_google_key_raises_on_failed_decrypt(tmp_path, monkeypatch):

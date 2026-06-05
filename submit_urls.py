@@ -293,10 +293,17 @@ def submit_urls_to_google(key_dictionary, url_list):
 
 def submit_urls_to_bing(api_key, site_url, url_list):
     """Submit URLs to the Bing index using an API key."""
+    request_url = (
+        "https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlBatch"
+        f"?apikey={api_key}"
+    )
+    redacted_url = (
+        "https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlBatch"
+        "?apikey=<redacted>"
+    )
     try:
         response = requests.post(
-            "https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlBatch"
-            f"?apikey={api_key}",
+            request_url,
             data=json.dumps({"siteUrl": site_url, "urlList": url_list}),
             headers={"Content-Type": "application/json; charset=utf-8"},
             timeout=HTTP_TIMEOUT_SECONDS,
@@ -304,8 +311,11 @@ def submit_urls_to_bing(api_key, site_url, url_list):
         response.raise_for_status()
         print(response.json())
     except (requests.exceptions.RequestException, ValueError) as e:
-        print(e)
-        raise SubmissionError("Bing submission failed.") from e
+        message = (
+            f"Bing submission failed ({type(e).__name__}) for {redacted_url}."
+        )
+        print(message)
+        raise SubmissionError(message) from None
 
 
 # Entry Point
