@@ -399,7 +399,12 @@ def configure(config_path):
 
     for section in PROVIDER_SECTIONS:
         config[section]["last_submitted"] = initial_checkpoint
-    config_io.write_config(config, config_path)
+    try:
+        config_io.write_config(config, config_path)
+    except OSError as e:
+        raise SubmissionError(
+            f"Unable to create configuration file '{config_path}': {e}"
+        ) from e
     raise ConfigCreated
 
 
@@ -418,7 +423,13 @@ def submit_provider_updates(config, config_path, provider_updates):
                     {url: "URL_UPDATED" for _, url in chunk},
                 )
                 update_provider_checkpoint(config, "Google", chunk)
-                config_io.write_config(config, config_path)
+                try:
+                    config_io.write_config(config, config_path)
+                except OSError as e:
+                    raise SubmissionError(
+                        "URL submission succeeded, but checkpoint "
+                        f"persistence failed: {e}"
+                    ) from e
         except SubmissionError as e:
             failures.append(f"Google: {e}")
 
@@ -436,7 +447,13 @@ def submit_provider_updates(config, config_path, provider_updates):
                     [url for _, url in chunk],
                 )
                 update_provider_checkpoint(config, "Bing", chunk)
-                config_io.write_config(config, config_path)
+                try:
+                    config_io.write_config(config, config_path)
+                except OSError as e:
+                    raise SubmissionError(
+                        "URL submission succeeded, but checkpoint "
+                        f"persistence failed: {e}"
+                    ) from e
         except SubmissionError as e:
             failures.append(f"Bing: {e}")
 
@@ -458,7 +475,6 @@ def main():
     validate_config(config, validate_secrets=not args.n)
     enabled_sections = get_enabled_provider_sections(config)
     if not enabled_sections:
-        config_io.write_config(config, config_path)
         return
 
     try:
@@ -483,7 +499,6 @@ def main():
         preview_urls.update({url: "URL_UPDATED" for _, url in url_list})
 
     if not preview_urls:
-        config_io.write_config(config, config_path)
         return
     if args.n:
         pprint.pprint(preview_urls)

@@ -4,6 +4,7 @@ import configparser
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -356,6 +357,23 @@ def test_configure_creates_default_config_and_raises_config_created(tmp_path):
     assert created["Google"]["last_submitted"]
     assert created["Bing"]["last_submitted"]
     assert not created["Common"].get("last_submitted", fallback="")
+
+
+def test_configure_reports_config_write_failure(tmp_path, monkeypatch):
+    config_path = tmp_path / "settings.ini"
+    monkeypatch.setattr(
+        submit_urls.config_io,
+        "write_config",
+        lambda config, path: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="Unable to create configuration file.*disk full",
+    ) as exc_info:
+        submit_urls.configure(str(config_path))
+
+    assert isinstance(exc_info.value.__cause__, OSError)
 
 
 def test_configure_reads_percent_encoded_sitemap_url_literally(tmp_path):
@@ -1261,6 +1279,77 @@ def test_cli_reports_malformed_config_without_traceback(tmp_path):
     assert "Traceback" not in completed.stderr
 
 
+def test_cli_reports_checkpoint_write_failure_without_traceback(
+    tmp_path, monkeypatch, capsys
+):
+    config_path = tmp_path / "settings.ini"
+    bing_key = tmp_path / "bing.txt.gpg"
+    bing_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+    }
+    config["Google"] = {
+        "can_submit": "0",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": str(bing_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        config.write(f)
+
+    class _PostResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": "ok"}
+
+    monkeypatch.setattr(sys, "argv", [str(Path(submit_urls.__file__))])
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "get_config_path",
+        lambda path: str(config_path),
+    )
+    monkeypatch.setattr(
+        submit_urls.subprocess,
+        "run",
+        lambda *args, **kwargs: _completed_process(stdout=b"secret"),
+    )
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "get",
+        lambda url, timeout: _Response(
+            "<urlset><url><loc>https://example.com/a</loc>"
+            "<lastmod>2024-01-02T00:00:00+00:00</lastmod>"
+            "</url></urlset>"
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls.requests,
+        "post",
+        lambda url, data, headers, timeout: _PostResponse(),
+    )
+    monkeypatch.setattr(
+        submit_urls.config_io,
+        "write_config",
+        lambda config, path: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_path(str(Path(submit_urls.__file__)), run_name="__main__")
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 1
+    assert "URL submission succeeded" in captured.err
+    assert "checkpoint persistence failed" in captured.err
+    assert "disk full" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_main_does_not_update_last_submitted_on_google_failure(
     monkeypatch, tmp_path
 ):
@@ -1546,6 +1635,57 @@ def test_submit_provider_updates_attempts_bing_after_google_failure(
     assert reloaded["Google"]["last_submitted"] == "2024-01-01T00:00:00+00:00"
     assert reloaded["Bing"]["last_submitted"] == "2024-01-02T00:00:00+00:00"
     assert not reloaded["Common"].get("last_submitted", fallback="")
+
+
+def test_submit_provider_updates_reports_checkpoint_write_failure(
+    monkeypatch, tmp_path
+):
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    submit_at = submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00")
+    submissions = []
+
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path: {"client_email": "demo@example.com"},
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_google",
+        lambda key_dictionary, url_list: submissions.append(dict(url_list)),
+    )
+    monkeypatch.setattr(
+        submit_urls.config_io,
+        "write_config",
+        lambda config, path: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match=(
+            "Provider submission failures: Google: URL submission succeeded, "
+            "but checkpoint persistence failed: disk full"
+        ),
+    ):
+        submit_urls.submit_provider_updates(
+            config,
+            str(tmp_path / "settings.ini"),
+            {"Google": [(submit_at, "https://example.com/a")]},
+        )
+
+    assert submissions == [{"https://example.com/a": "URL_UPDATED"}]
 
 
 def test_main_persists_google_checkpoint_after_successful_chunk(
