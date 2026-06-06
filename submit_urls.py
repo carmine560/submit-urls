@@ -415,36 +415,49 @@ def configure(config_path):
 
 def submit_provider_updates(config, config_path, provider_updates):
     """Submit provider URL updates and persist successful chunk checkpoints."""
+    failures = []
+
     google_entries = provider_updates.get("Google", [])
     if google_entries:
-        key_dictionary = load_google_key(config["Google"]["json_key_path"])
-        for i in range(0, len(google_entries), GOOGLE_BATCH_SIZE):
-            chunk = google_entries[i : i + GOOGLE_BATCH_SIZE]
-            submit_urls_to_google(
-                key_dictionary,
-                {url: "URL_UPDATED" for _, url in chunk},
-            )
-            config["Google"]["last_submitted"] = chunk[-1][0].isoformat()
-            config["Google"]["last_submitted_url"] = chunk[-1][1]
-            sync_common_last_submitted(config)
-            config_io.write_config(config, config_path)
+        try:
+            key_dictionary = load_google_key(config["Google"]["json_key_path"])
+            for i in range(0, len(google_entries), GOOGLE_BATCH_SIZE):
+                chunk = google_entries[i : i + GOOGLE_BATCH_SIZE]
+                submit_urls_to_google(
+                    key_dictionary,
+                    {url: "URL_UPDATED" for _, url in chunk},
+                )
+                config["Google"]["last_submitted"] = chunk[-1][0].isoformat()
+                config["Google"]["last_submitted_url"] = chunk[-1][1]
+                sync_common_last_submitted(config)
+                config_io.write_config(config, config_path)
+        except SubmissionError as e:
+            failures.append(f"Google: {e}")
 
     bing_entries = provider_updates.get("Bing", [])
     if bing_entries:
-        api_key = load_bing_api_key(config["Bing"]["api_key_path"])
-        parsed_url = urlparse(config["Common"]["sitemap_url"])
-        site_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        for i in range(0, len(bing_entries), BING_BATCH_SIZE):
-            chunk = bing_entries[i : i + BING_BATCH_SIZE]
-            submit_urls_to_bing(
-                api_key,
-                site_url,
-                [url for _, url in chunk],
-            )
-            config["Bing"]["last_submitted"] = chunk[-1][0].isoformat()
-            config["Bing"]["last_submitted_url"] = chunk[-1][1]
-            sync_common_last_submitted(config)
-            config_io.write_config(config, config_path)
+        try:
+            api_key = load_bing_api_key(config["Bing"]["api_key_path"])
+            parsed_url = urlparse(config["Common"]["sitemap_url"])
+            site_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            for i in range(0, len(bing_entries), BING_BATCH_SIZE):
+                chunk = bing_entries[i : i + BING_BATCH_SIZE]
+                submit_urls_to_bing(
+                    api_key,
+                    site_url,
+                    [url for _, url in chunk],
+                )
+                config["Bing"]["last_submitted"] = chunk[-1][0].isoformat()
+                config["Bing"]["last_submitted_url"] = chunk[-1][1]
+                sync_common_last_submitted(config)
+                config_io.write_config(config, config_path)
+        except SubmissionError as e:
+            failures.append(f"Bing: {e}")
+
+    if failures:
+        raise SubmissionError(
+            f"Provider submission failures: {'; '.join(failures)}"
+        )
 
 
 def main():

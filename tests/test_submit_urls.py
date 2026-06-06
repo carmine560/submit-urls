@@ -1395,6 +1395,66 @@ def test_main_persists_successful_provider_on_partial_failure(
     )
 
 
+def test_submit_provider_updates_attempts_bing_after_google_failure(
+    monkeypatch, tmp_path
+):
+    config_path = tmp_path / "settings.ini"
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(tmp_path / "google.json.gpg"),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+    submit_at = submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00")
+    provider_updates = {
+        "Google": [(submit_at, "https://example.com/a")],
+        "Bing": [(submit_at, "https://example.com/a")],
+    }
+    bing_submissions = []
+
+    monkeypatch.setattr(
+        submit_urls,
+        "load_google_key",
+        lambda path: (_ for _ in ()).throw(
+            submit_urls.SubmissionError("Google key failed.")
+        ),
+    )
+    monkeypatch.setattr(
+        submit_urls, "load_bing_api_key", lambda path: "secret"
+    )
+    monkeypatch.setattr(
+        submit_urls,
+        "submit_urls_to_bing",
+        lambda api_key, site_url, url_list: bing_submissions.append(
+            (site_url, list(url_list))
+        ),
+    )
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="Provider submission failures: Google: Google key failed.",
+    ):
+        submit_urls.submit_provider_updates(
+            config, str(config_path), provider_updates
+        )
+
+    reloaded = configparser.ConfigParser()
+    reloaded.read(config_path, encoding="utf-8")
+    assert bing_submissions == [
+        ("https://example.com", ["https://example.com/a"])
+    ]
+    assert not reloaded["Google"].get("last_submitted", fallback="")
+    assert reloaded["Bing"]["last_submitted"] == "2024-01-02T00:00:00+00:00"
+    assert reloaded["Common"]["last_submitted"] == "2024-01-01T00:00:00+00:00"
+
+
 def test_main_persists_google_checkpoint_after_successful_chunk(
     monkeypatch, tmp_path
 ):
