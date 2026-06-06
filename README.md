@@ -39,7 +39,7 @@ python -m pip install -r requirements.txt -c constraints.txt
 
 ``` shell
 python -m pip install -r requirements-dev.txt -c constraints.txt
-pytest
+python -m pytest -q
 ```
 
 ## Usage
