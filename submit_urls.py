@@ -382,7 +382,7 @@ def get_arguments():
 
 def configure(config_path):
     """Create or read a configuration file."""
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
     config["Common"] = {
         "sitemap_url": DEFAULT_SITEMAP_URL,
         "last_submitted": datetime.now(timezone.utc).isoformat(),
@@ -401,7 +401,12 @@ def configure(config_path):
     }
 
     if os.path.isfile(config_path):
-        config.read(config_path)
+        try:
+            config.read(config_path)
+        except configparser.Error as e:
+            raise SubmissionError(
+                f"Unable to parse configuration file '{config_path}': {e}"
+            ) from e
         return config
 
     config_io.write_config(config, config_path)

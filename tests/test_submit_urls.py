@@ -308,6 +308,29 @@ def test_configure_creates_default_config_and_raises_config_created(tmp_path):
     assert created["Bing"]["api_key_path"].endswith("api_key.txt.gpg")
 
 
+def test_configure_reads_percent_encoded_sitemap_url_literally(tmp_path):
+    config_path = tmp_path / "settings.ini"
+    config_path.write_text(
+        "[Common]\n"
+        "sitemap_url = https://example.com/sitemap%20index.xml\n"
+        "last_submitted = 2024-01-01T00:00:00+00:00\n"
+        "\n"
+        "[Google]\n"
+        "can_submit = 0\n"
+        "\n"
+        "[Bing]\n"
+        "can_submit = 0\n",
+        encoding="utf-8",
+    )
+
+    config = submit_urls.configure(str(config_path))
+
+    assert config["Common"]["sitemap_url"] == (
+        "https://example.com/sitemap%20index.xml"
+    )
+    submit_urls.validate_config(config)
+
+
 def test_validate_config_rejects_placeholder_sitemap_url(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
@@ -1117,6 +1140,30 @@ def test_cli_reports_submission_error_without_traceback(tmp_path):
     assert "Configured file 'Google.json_key_path' does not exist" in (
         completed.stderr
     )
+    assert "Traceback" not in completed.stderr
+
+
+def test_cli_reports_malformed_config_without_traceback(tmp_path):
+    config_dir = tmp_path / "xdg-config" / "submit-urls"
+    config_dir.mkdir(parents=True)
+    config_path = config_dir / "submit_urls.ini"
+    config_path.write_text("not an ini file\n", encoding="utf-8")
+
+    env = os.environ.copy()
+    env["XDG_CONFIG_HOME"] = str(tmp_path / "xdg-config")
+    completed = subprocess.run(
+        [sys.executable, str(Path(submit_urls.__file__))],
+        cwd=Path(submit_urls.__file__).parent,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert completed.stdout == ""
+    assert "Unable to parse configuration file" in completed.stderr
     assert "Traceback" not in completed.stderr
 
 
