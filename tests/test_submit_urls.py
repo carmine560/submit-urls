@@ -228,7 +228,7 @@ def test_get_updated_entries_resumes_within_same_timestamp_by_url():
             },
         ],
         "2024-01-01T00:00:00+00:00",
-        "https://example.com/b",
+        {"https://example.com/a", "https://example.com/b"},
     )
 
     assert result == [
@@ -237,6 +237,54 @@ def test_get_updated_entries_resumes_within_same_timestamp_by_url():
             "https://example.com/c",
         )
     ]
+
+
+def test_get_updated_entries_includes_late_url_at_checkpoint_timestamp():
+    checkpoint_at = "2024-01-02T00:00:00+00:00"
+    first_run = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/b",
+                "lastmod": checkpoint_at,
+            }
+        ],
+        "2024-01-01T00:00:00+00:00",
+    )
+
+    second_run = submit_urls.get_updated_entries(
+        [
+            {
+                "loc": "https://example.com/a",
+                "lastmod": checkpoint_at,
+            },
+            {
+                "loc": "https://example.com/b",
+                "lastmod": checkpoint_at,
+            },
+        ],
+        checkpoint_at,
+        {url for _, url in first_run},
+    )
+
+    assert second_run == [
+        (
+            submit_urls.parse_timestamp(checkpoint_at),
+            "https://example.com/a",
+        )
+    ]
+
+
+def test_get_checkpoint_urls_reads_legacy_single_url():
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "last_submitted": "2024-01-02T00:00:00+00:00",
+        "last_submitted_url": "https://example.com/b",
+    }
+    config["Google"] = {}
+
+    assert submit_urls.get_checkpoint_urls(config, "Google") == {
+        "https://example.com/b"
+    }
 
 
 def test_get_updated_entries_tracks_max_lastmod_independent_of_order():
@@ -419,6 +467,59 @@ def test_validate_config_rejects_invalid_provider_last_submitted(tmp_path):
         match="Google.last_submitted",
     ):
         submit_urls.validate_config(config)
+
+
+def test_validate_config_rejects_invalid_checkpoint_urls(tmp_path):
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "sitemap_url": "https://example.com/sitemap.xml",
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+        "last_submitted_urls": "not JSON",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "json_key_path": str(google_key),
+    }
+    config["Bing"] = {
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+    }
+
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="Common.last_submitted_urls.*JSON list",
+    ):
+        submit_urls.validate_config(config)
+
+
+def test_sync_common_checkpoint_keeps_only_urls_submitted_by_all_providers():
+    config = configparser.ConfigParser()
+    config["Common"] = {
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+    }
+    config["Google"] = {
+        "can_submit": "1",
+        "last_submitted": "2024-01-02T00:00:00+00:00",
+        "last_submitted_urls": json.dumps(
+            ["https://example.com/a", "https://example.com/b"]
+        ),
+    }
+    config["Bing"] = {
+        "can_submit": "1",
+        "last_submitted": "2024-01-02T00:00:00+00:00",
+        "last_submitted_urls": json.dumps(
+            ["https://example.com/b", "https://example.com/c"]
+        ),
+    }
+
+    submit_urls.sync_common_last_submitted(config)
+
+    assert config["Common"]["last_submitted"] == "2024-01-02T00:00:00+00:00"
+    assert json.loads(config["Common"]["last_submitted_urls"]) == [
+        "https://example.com/b"
+    ]
 
 
 def test_submit_urls_to_google_batches_each_url(monkeypatch):
@@ -1631,7 +1732,10 @@ def test_main_resumes_google_chunk_with_same_lastmod_after_failure(
     assert reloaded["Google"]["last_submitted"] == (
         "2024-01-02T00:00:00+00:00"
     )
-    assert reloaded["Google"]["last_submitted_url"] == "https://example.com/b"
+    assert json.loads(reloaded["Google"]["last_submitted_urls"]) == [
+        "https://example.com/a",
+        "https://example.com/b",
+    ]
 
     submit_urls.main()
 
@@ -1817,7 +1921,10 @@ def test_main_resumes_bing_chunk_with_same_lastmod_after_failure(
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
     assert reloaded["Bing"]["last_submitted"] == ("2024-01-02T00:00:00+00:00")
-    assert reloaded["Bing"]["last_submitted_url"] == "https://example.com/b"
+    assert json.loads(reloaded["Bing"]["last_submitted_urls"]) == [
+        "https://example.com/a",
+        "https://example.com/b",
+    ]
 
     submit_urls.main()
 
