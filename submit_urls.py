@@ -111,15 +111,6 @@ def validate_config(config, validate_secrets=True):
     sitemap_url = get_required_option(config, "Common", "sitemap_url")
     validate_url(sitemap_url, "Common.sitemap_url")
 
-    last_submitted = get_required_option(config, "Common", "last_submitted")
-    try:
-        parse_timestamp(last_submitted)
-    except ValueError as e:
-        raise SubmissionError(
-            "Config option 'Common.last_submitted' must be an ISO 8601 "
-            "timestamp."
-        ) from e
-
     google_can_submit = get_required_boolean_option(
         config, "Google", "can_submit"
     )
@@ -134,13 +125,11 @@ def validate_config(config, validate_secrets=True):
         bing_key_path = get_required_option(config, "Bing", "api_key_path")
         validate_secret_path(bing_key_path, "Bing.api_key_path")
 
-    for section in PROVIDER_SECTIONS:
+    for section in get_enabled_provider_sections(config):
         get_checkpoint_urls(config, section)
-        provider_last_submitted = config.get(
-            section, "last_submitted", fallback=""
-        ).strip()
-        if not provider_last_submitted:
-            continue
+        provider_last_submitted = get_required_option(
+            config, section, "last_submitted"
+        )
         try:
             parse_timestamp(provider_last_submitted)
         except ValueError as e:
@@ -257,21 +246,8 @@ def get_enabled_provider_sections(config):
     ]
 
 
-def get_provider_last_submitted(config, section):
-    """Return a provider checkpoint or fall back to the common one."""
-    provider_last_submitted = config.get(
-        section, "last_submitted", fallback=""
-    ).strip()
-    if provider_last_submitted:
-        return provider_last_submitted
-    return config["Common"]["last_submitted"]
-
-
 def get_checkpoint_urls(config, section):
     """Return URLs submitted at a section's checkpoint timestamp."""
-    if not config.get(section, "last_submitted", fallback="").strip():
-        section = "Common"
-
     value = config.get(section, "last_submitted_urls", fallback="").strip()
     if value:
         try:
@@ -296,46 +272,10 @@ def get_checkpoint_urls(config, section):
     return None
 
 
-def sync_common_last_submitted(config):
-    """Keep the common checkpoint aligned to enabled providers."""
-    enabled_sections = get_enabled_provider_sections(config)
-    if not enabled_sections:
-        return
-
-    provider_checkpoints = []
-    for section in enabled_sections:
-        provider_checkpoints.append(
-            (
-                parse_timestamp(get_provider_last_submitted(config, section)),
-                get_checkpoint_urls(config, section),
-            )
-        )
-
-    common_last_submitted = min(
-        checkpoint_at for checkpoint_at, _ in provider_checkpoints
-    )
-    boundary_url_sets = [
-        urls
-        for checkpoint_at, urls in provider_checkpoints
-        if checkpoint_at == common_last_submitted and urls is not None
-    ]
-    config["Common"]["last_submitted"] = common_last_submitted.isoformat()
-    if boundary_url_sets:
-        common_urls = set.intersection(*boundary_url_sets)
-        config["Common"]["last_submitted_urls"] = json.dumps(
-            sorted(common_urls)
-        )
-    else:
-        config["Common"].pop("last_submitted_urls", None)
-    config["Common"].pop("last_submitted_url", None)
-
-
 def update_provider_checkpoint(config, section, chunk):
     """Record URLs submitted at the provider's newest checkpoint timestamp."""
     checkpoint_at = chunk[-1][0]
-    if checkpoint_at == parse_timestamp(
-        get_provider_last_submitted(config, section)
-    ):
+    if checkpoint_at == parse_timestamp(config[section]["last_submitted"]):
         checkpoint_urls = get_checkpoint_urls(config, section)
     else:
         checkpoint_urls = None
@@ -348,7 +288,6 @@ def update_provider_checkpoint(config, section, chunk):
         sorted(checkpoint_urls)
     )
     config[section].pop("last_submitted_url", None)
-    sync_common_last_submitted(config)
 
 
 def submit_urls_to_google(key_dictionary, url_list):
@@ -432,9 +371,9 @@ def get_arguments():
 def configure(config_path):
     """Create or read a configuration file."""
     config = configparser.ConfigParser(interpolation=None)
+    initial_checkpoint = datetime.now(timezone.utc).isoformat()
     config["Common"] = {
         "sitemap_url": DEFAULT_SITEMAP_URL,
-        "last_submitted": datetime.now(timezone.utc).isoformat(),
     }
     config["Google"] = {
         "can_submit": "1",
@@ -458,6 +397,8 @@ def configure(config_path):
             ) from e
         return config
 
+    for section in PROVIDER_SECTIONS:
+        config[section]["last_submitted"] = initial_checkpoint
     config_io.write_config(config, config_path)
     raise ConfigCreated
 
@@ -533,7 +474,7 @@ def main():
         try:
             url_list = get_updated_entries(
                 url_items,
-                get_provider_last_submitted(config, section),
+                config[section]["last_submitted"],
                 get_checkpoint_urls(config, section),
             )
         except ValueError as e:
@@ -542,7 +483,6 @@ def main():
         preview_urls.update({url: "URL_UPDATED" for _, url in url_list})
 
     if not preview_urls:
-        sync_common_last_submitted(config)
         config_io.write_config(config, config_path)
         return
     if args.n:

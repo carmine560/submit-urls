@@ -276,11 +276,10 @@ def test_get_updated_entries_includes_late_url_at_checkpoint_timestamp():
 
 def test_get_checkpoint_urls_reads_legacy_single_url():
     config = configparser.ConfigParser()
-    config["Common"] = {
+    config["Google"] = {
         "last_submitted": "2024-01-02T00:00:00+00:00",
         "last_submitted_url": "https://example.com/b",
     }
-    config["Google"] = {}
 
     assert submit_urls.get_checkpoint_urls(config, "Google") == {
         "https://example.com/b"
@@ -354,6 +353,9 @@ def test_configure_creates_default_config_and_raises_config_created(tmp_path):
     )
     assert created["Google"]["json_key_path"].endswith("JSON_KEY.JSON.GPG")
     assert created["Bing"]["api_key_path"].endswith("api_key.txt.gpg")
+    assert created["Google"]["last_submitted"]
+    assert created["Bing"]["last_submitted"]
+    assert not created["Common"].get("last_submitted", fallback="")
 
 
 def test_configure_reads_percent_encoded_sitemap_url_literally(tmp_path):
@@ -361,7 +363,6 @@ def test_configure_reads_percent_encoded_sitemap_url_literally(tmp_path):
     config_path.write_text(
         "[Common]\n"
         "sitemap_url = https://example.com/sitemap%20index.xml\n"
-        "last_submitted = 2024-01-01T00:00:00+00:00\n"
         "\n"
         "[Google]\n"
         "can_submit = 0\n"
@@ -383,7 +384,6 @@ def test_validate_config_rejects_placeholder_sitemap_url(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "HTTPS://EXAMPLE.COM/SITEMAP.XML",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "0",
@@ -404,7 +404,6 @@ def test_validate_config_rejects_missing_enabled_secret_path(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
@@ -427,15 +426,16 @@ def test_validate_config_rejects_invalid_last_submitted(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "not-a-timestamp",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "not-a-timestamp",
     }
     config["Bing"] = {
         "can_submit": "0",
         "api_key_path": str(tmp_path / "bing.txt.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
 
     with pytest.raises(
@@ -450,7 +450,6 @@ def test_validate_config_rejects_invalid_provider_last_submitted(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
@@ -469,57 +468,50 @@ def test_validate_config_rejects_invalid_provider_last_submitted(tmp_path):
         submit_urls.validate_config(config)
 
 
-def test_validate_config_rejects_invalid_checkpoint_urls(tmp_path):
+def test_validate_config_allows_disabled_provider_without_checkpoint(tmp_path):
     google_key = tmp_path / "google.json.gpg"
     google_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
-        "last_submitted_urls": "not JSON",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
         "api_key_path": str(tmp_path / "bing.txt.gpg"),
     }
 
-    with pytest.raises(
-        submit_urls.SubmissionError,
-        match="Common.last_submitted_urls.*JSON list",
-    ):
-        submit_urls.validate_config(config)
+    submit_urls.validate_config(config)
 
 
-def test_sync_common_checkpoint_keeps_only_urls_submitted_by_all_providers():
+def test_validate_config_rejects_invalid_checkpoint_urls(tmp_path):
+    google_key = tmp_path / "google.json.gpg"
+    google_key.write_bytes(b"encrypted")
     config = configparser.ConfigParser()
     config["Common"] = {
-        "last_submitted": "2024-01-01T00:00:00+00:00",
+        "sitemap_url": "https://example.com/sitemap.xml",
     }
     config["Google"] = {
         "can_submit": "1",
-        "last_submitted": "2024-01-02T00:00:00+00:00",
-        "last_submitted_urls": json.dumps(
-            ["https://example.com/a", "https://example.com/b"]
-        ),
+        "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
+        "last_submitted_urls": "not JSON",
     }
     config["Bing"] = {
-        "can_submit": "1",
-        "last_submitted": "2024-01-02T00:00:00+00:00",
-        "last_submitted_urls": json.dumps(
-            ["https://example.com/b", "https://example.com/c"]
-        ),
+        "can_submit": "0",
+        "api_key_path": str(tmp_path / "bing.txt.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
 
-    submit_urls.sync_common_last_submitted(config)
-
-    assert config["Common"]["last_submitted"] == "2024-01-02T00:00:00+00:00"
-    assert json.loads(config["Common"]["last_submitted_urls"]) == [
-        "https://example.com/b"
-    ]
+    with pytest.raises(
+        submit_urls.SubmissionError,
+        match="Google.last_submitted_urls.*JSON list",
+    ):
+        submit_urls.validate_config(config)
 
 
 def test_submit_urls_to_google_batches_each_url(monkeypatch):
@@ -985,15 +977,16 @@ def test_main_dry_run_allows_missing_provider_secret_files(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(tmp_path / "missing-bing.txt.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -1064,11 +1057,11 @@ def test_main_wraps_sitemap_fetch_error(monkeypatch, tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1113,11 +1106,11 @@ def test_main_wraps_xml_parse_error(monkeypatch, tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1162,11 +1155,11 @@ def test_main_wraps_malformed_sitemap_error(monkeypatch, tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1211,11 +1204,11 @@ def test_cli_reports_submission_error_without_traceback(tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "missing-google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1277,11 +1270,11 @@ def test_main_does_not_update_last_submitted_on_google_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1339,9 +1332,10 @@ def test_main_does_not_update_last_submitted_on_google_failure(
 
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
-    assert reloaded["Common"]["last_submitted"] == (
+    assert reloaded["Google"]["last_submitted"] == (
         "2024-01-01T00:00:00+00:00"
     )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_persists_successful_provider_on_partial_failure(
@@ -1355,15 +1349,16 @@ def test_main_persists_successful_provider_on_partial_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(bing_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -1462,10 +1457,8 @@ def test_main_persists_successful_provider_on_partial_failure(
     assert reloaded["Google"]["last_submitted"] == (
         "2024-01-02T00:00:00+00:00"
     )
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-01T00:00:00+00:00"
-    )
-    assert not reloaded["Bing"].get("last_submitted", fallback="")
+    assert reloaded["Bing"]["last_submitted"] == ("2024-01-01T00:00:00+00:00")
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
     submit_urls.main()
 
@@ -1491,9 +1484,7 @@ def test_main_persists_successful_provider_on_partial_failure(
         "2024-01-02T00:00:00+00:00"
     )
     assert reloaded["Bing"]["last_submitted"] == ("2024-01-02T00:00:00+00:00")
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-02T00:00:00+00:00"
-    )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_submit_provider_updates_attempts_bing_after_google_failure(
@@ -1503,15 +1494,16 @@ def test_submit_provider_updates_attempts_bing_after_google_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(tmp_path / "google.json.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(tmp_path / "bing.txt.gpg"),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     submit_at = submit_urls.parse_timestamp("2024-01-02T00:00:00+00:00")
     provider_updates = {
@@ -1551,9 +1543,9 @@ def test_submit_provider_updates_attempts_bing_after_google_failure(
     assert bing_submissions == [
         ("https://example.com", ["https://example.com/a"])
     ]
-    assert not reloaded["Google"].get("last_submitted", fallback="")
+    assert reloaded["Google"]["last_submitted"] == "2024-01-01T00:00:00+00:00"
     assert reloaded["Bing"]["last_submitted"] == "2024-01-02T00:00:00+00:00"
-    assert reloaded["Common"]["last_submitted"] == "2024-01-01T00:00:00+00:00"
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_persists_google_checkpoint_after_successful_chunk(
@@ -1565,11 +1557,11 @@ def test_main_persists_google_checkpoint_after_successful_chunk(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1645,9 +1637,7 @@ def test_main_persists_google_checkpoint_after_successful_chunk(
     assert reloaded["Google"]["last_submitted"] == (
         "2024-01-03T00:00:00+00:00"
     )
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-03T00:00:00+00:00"
-    )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_resumes_google_chunk_with_same_lastmod_after_failure(
@@ -1659,11 +1649,11 @@ def test_main_resumes_google_chunk_with_same_lastmod_after_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -1758,7 +1748,6 @@ def test_main_persists_bing_checkpoint_after_successful_chunk(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "0",
@@ -1767,6 +1756,7 @@ def test_main_persists_bing_checkpoint_after_successful_chunk(
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(bing_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -1836,9 +1826,7 @@ def test_main_persists_bing_checkpoint_after_successful_chunk(
         ("https://example.com", ["https://example.com/c"]),
     ]
     assert reloaded["Bing"]["last_submitted"] == ("2024-01-03T00:00:00+00:00")
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-03T00:00:00+00:00"
-    )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_resumes_bing_chunk_with_same_lastmod_after_failure(
@@ -1850,7 +1838,6 @@ def test_main_resumes_bing_chunk_with_same_lastmod_after_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "0",
@@ -1859,6 +1846,7 @@ def test_main_resumes_bing_chunk_with_same_lastmod_after_failure(
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(bing_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -1945,7 +1933,6 @@ def test_main_fails_fast_before_network_on_invalid_config(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "HTTPS://EXAMPLE.COM/SITEMAP.XML",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "0",
@@ -1996,7 +1983,6 @@ def test_main_skips_sitemap_fetch_when_no_providers_enabled(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "0",
@@ -2038,9 +2024,9 @@ def test_main_skips_sitemap_fetch_when_no_providers_enabled(
 
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-01T00:00:00+00:00"
-    )
+    assert not reloaded["Google"].get("last_submitted", fallback="")
+    assert not reloaded["Bing"].get("last_submitted", fallback="")
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_does_not_update_last_submitted_on_decrypt_failure(
@@ -2052,11 +2038,11 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -2110,9 +2096,10 @@ def test_main_does_not_update_last_submitted_on_decrypt_failure(
 
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
-    assert reloaded["Common"]["last_submitted"] == (
+    assert reloaded["Google"]["last_submitted"] == (
         "2024-01-01T00:00:00+00:00"
     )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
@@ -2124,15 +2111,16 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "1",
         "api_key_path": str(bing_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     with open(config_path, "w", encoding="utf-8") as f:
         config.write(f)
@@ -2223,9 +2211,7 @@ def test_main_persists_newest_submitted_lastmod(monkeypatch, tmp_path):
         "2024-01-05T00:00:00+00:00"
     )
     assert reloaded["Bing"]["last_submitted"] == ("2024-01-05T00:00:00+00:00")
-    assert reloaded["Common"]["last_submitted"] == (
-        "2024-01-05T00:00:00+00:00"
-    )
+    assert not reloaded["Common"].get("last_submitted", fallback="")
 
 
 def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
@@ -2237,11 +2223,11 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
     config = configparser.ConfigParser()
     config["Common"] = {
         "sitemap_url": "https://example.com/sitemap.xml",
-        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Google"] = {
         "can_submit": "1",
         "json_key_path": str(google_key),
+        "last_submitted": "2024-01-01T00:00:00+00:00",
     }
     config["Bing"] = {
         "can_submit": "0",
@@ -2331,6 +2317,8 @@ def test_main_uses_lastmod_checkpoint_to_avoid_clock_drift(
 
     reloaded = configparser.ConfigParser()
     reloaded.read(config_path, encoding="utf-8")
-    assert reloaded["Common"]["last_submitted"] == (
+    assert reloaded["Google"]["last_submitted"] == (
         "2024-01-07T00:00:00+00:00"
     )
+    assert not reloaded["Bing"].get("last_submitted", fallback="")
+    assert not reloaded["Common"].get("last_submitted", fallback="")
