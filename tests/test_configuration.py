@@ -47,13 +47,12 @@ def test_read_config_raises_on_gpg_timeout(tmp_path, monkeypatch):
     encrypted_config_path.write_bytes(b"encrypted")
     loaded = configparser.ConfigParser()
 
-    def timeout_run(*args, **kwargs):
-        raise config_io.subprocess.TimeoutExpired(
-            args[0],
-            kwargs["timeout"],
+    def timeout_read(*args, **kwargs):
+        raise config_io.UtilityOperationError(
+            "GPG decryption timed out after 30 seconds."
         )
 
-    monkeypatch.setattr(config_io.subprocess, "run", timeout_run)
+    monkeypatch.setattr(config_io, "read_encrypted_file", timeout_read)
 
     with pytest.raises(
         config_io.ConfigError, match="GPG decryption timed out"
@@ -66,13 +65,12 @@ def test_write_config_raises_on_gpg_timeout(tmp_path, monkeypatch):
     written = configparser.ConfigParser()
     written["General"] = {"enabled": "true"}
 
-    def timeout_run(*args, **kwargs):
-        raise config_io.subprocess.TimeoutExpired(
-            args[0],
-            kwargs["timeout"],
+    def timeout_write(*args, **kwargs):
+        raise config_io.UtilityOperationError(
+            "GPG encryption timed out after 30 seconds."
         )
 
-    monkeypatch.setattr(config_io.subprocess, "run", timeout_run)
+    monkeypatch.setattr(config_io, "write_encrypted_file", timeout_write)
 
     with pytest.raises(
         config_io.ConfigError, match="GPG encryption timed out"
