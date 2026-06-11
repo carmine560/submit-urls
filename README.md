@@ -15,12 +15,12 @@ requires the following packages:
 
   * [GnuPG](https://gnupg.org/index.html) to decrypt your encrypted JSON key
     file and API key file for authorization
-  * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client/)
+  * [`google-api-python-client`](https://github.com/googleapis/google-api-python-client)
     to access Google APIs
-  * [`google-auth`](https://github.com/googleapis/google-auth-library-python)
+  * [`google-auth`](https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth)
     to authenticate with Google APIs
-  * [`requests`](https://requests.readthedocs.io/en/latest/) to fetch the
-    sitemap and submit URLs through the Bing Webmaster API
+  * [`requests`](https://github.com/psf/requests) to fetch the sitemap and
+    submit URLs through the Bing Webmaster API
   * [`xmltodict`](https://github.com/martinblech/xmltodict) to convert the
     sitemap to a dictionary
 
