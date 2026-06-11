@@ -8,7 +8,6 @@ import io
 import json
 import os
 import pprint
-import subprocess
 import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -24,7 +23,6 @@ from core_utilities import file_utilities
 
 DEFAULT_SITEMAP_URL = "HTTPS://EXAMPLE.COM/SITEMAP.XML"
 HTTP_TIMEOUT_SECONDS = 10
-GPG_TIMEOUT_SECONDS = 30
 GOOGLE_BATCH_SIZE = 100
 BING_BATCH_SIZE = 500
 PROVIDER_SECTIONS = ("Google", "Bing")
@@ -189,49 +187,23 @@ def get_updated_entries(url_items, last_submitted, submitted_urls=None):
 # Secret Loading
 
 
-def _decrypt_data(path):
-    """Decrypt and validate secret data loaded from a file."""
-    try:
-        decrypted = subprocess.run(
-            [
-                "gpg",
-                "--batch",
-                "--yes",
-                "--decrypt",
-                path,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=GPG_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as e:
-        raise SubmissionError(
-            f"GPG decryption timed out after {GPG_TIMEOUT_SECONDS} seconds."
-        ) from e
-    except OSError as e:
-        raise SubmissionError(f"Unable to run gpg: {e}") from e
-    if decrypted.returncode:
-        status = decrypted.stderr.decode("utf-8", errors="replace").strip()
-        if not status:
-            status = f"gpg exited with status {decrypted.returncode}"
-        raise SubmissionError(f"GPG decryption failed: {status}")
-    if not decrypted.stdout:
-        raise SubmissionError("Decryption returned no data.")
-    return decrypted.stdout
-
-
 def load_google_key(path):
     """Load and validate the decrypted Google service account JSON."""
     try:
-        return json.load(io.BytesIO(_decrypt_data(path)))
+        decrypted = file_utilities.read_encrypted_file(path)
+        return json.load(io.BytesIO(decrypted))
+    except file_utilities.UtilityOperationError as e:
+        raise SubmissionError(str(e)) from e
     except json.JSONDecodeError as e:
         raise SubmissionError("Google key is not valid JSON.") from e
 
 
 def load_bing_api_key(path):
     """Load and validate the decrypted Bing API key."""
-    return _decrypt_data(path).decode().strip()
+    try:
+        return file_utilities.read_encrypted_file(path).decode().strip()
+    except file_utilities.UtilityOperationError as e:
+        raise SubmissionError(str(e)) from e
 
 
 # Submission

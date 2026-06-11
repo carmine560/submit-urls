@@ -23,50 +23,6 @@ class _Response:
         return None
 
 
-def _completed_process(returncode=0, stdout=b"", stderr=b""):
-    return SimpleNamespace(
-        returncode=returncode,
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-
-def test_decrypt_data_returns_decrypted_bytes(tmp_path, monkeypatch):
-    secret_path = tmp_path / "secret.bin"
-    secret_path.write_bytes(b"payload")
-    calls = []
-
-    def fake_run(args, stdout, stderr, check, timeout):
-        calls.append(
-            {
-                "args": args,
-                "stdout": stdout,
-                "stderr": stderr,
-                "check": check,
-                "timeout": timeout,
-            }
-        )
-        return _completed_process(stdout=b"payload")
-
-    monkeypatch.setattr(submit_urls.subprocess, "run", fake_run)
-    assert submit_urls._decrypt_data(str(secret_path)) == b"payload"
-    assert calls == [
-        {
-            "args": [
-                "gpg",
-                "--batch",
-                "--yes",
-                "--decrypt",
-                str(secret_path),
-            ],
-            "stdout": submit_urls.subprocess.PIPE,
-            "stderr": submit_urls.subprocess.PIPE,
-            "check": False,
-            "timeout": submit_urls.GPG_TIMEOUT_SECONDS,
-        }
-    ]
-
-
 def test_parse_timestamp_normalizes_z_suffix():
     assert submit_urls.parse_timestamp("2024-01-01T00:00:00Z") == (
         submit_urls.parse_timestamp("2024-01-01T00:00:00+00:00")
@@ -864,13 +820,15 @@ def test_load_google_key_raises_on_failed_decrypt(tmp_path, monkeypatch):
     key_path = tmp_path / "key.json.gpg"
     key_path.write_bytes(b"encrypted")
 
+    def failed_read(path):
+        raise submit_urls.file_utilities.UtilityOperationError(
+            "GPG decryption failed: bad decrypt"
+        )
+
     monkeypatch.setattr(
-        submit_urls.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(
-            returncode=2,
-            stderr=b"bad decrypt",
-        ),
+        submit_urls.file_utilities,
+        "read_encrypted_file",
+        failed_read,
     )
 
     with pytest.raises(
@@ -884,10 +842,16 @@ def test_load_google_key_raises_on_decrypt_timeout(tmp_path, monkeypatch):
     key_path = tmp_path / "key.json.gpg"
     key_path.write_bytes(b"encrypted")
 
-    def timeout_run(*args, **kwargs):
-        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+    def timeout_read(path):
+        raise submit_urls.file_utilities.UtilityOperationError(
+            "GPG decryption timed out after 30 seconds."
+        )
 
-    monkeypatch.setattr(submit_urls.subprocess, "run", timeout_run)
+    monkeypatch.setattr(
+        submit_urls.file_utilities,
+        "read_encrypted_file",
+        timeout_read,
+    )
 
     with pytest.raises(
         submit_urls.SubmissionError,
@@ -901,9 +865,9 @@ def test_load_google_key_raises_on_invalid_json(tmp_path, monkeypatch):
     key_path.write_bytes(b"encrypted")
 
     monkeypatch.setattr(
-        submit_urls.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(stdout=b"not json"),
+        submit_urls.file_utilities,
+        "read_encrypted_file",
+        lambda path: b"not json",
     )
 
     with pytest.raises(submit_urls.SubmissionError, match="valid JSON"):
@@ -915,9 +879,9 @@ def test_load_bing_api_key_returns_stripped_text(tmp_path, monkeypatch):
     key_path.write_bytes(b"encrypted")
 
     monkeypatch.setattr(
-        submit_urls.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(stdout=b"secret-key \n"),
+        submit_urls.file_utilities,
+        "read_encrypted_file",
+        lambda path: b"secret-key \n",
     )
 
     assert submit_urls.load_bing_api_key(str(key_path)) == "secret-key"
@@ -1315,9 +1279,9 @@ def test_cli_reports_checkpoint_write_failure_without_traceback(
         lambda path: str(config_path),
     )
     monkeypatch.setattr(
-        submit_urls.subprocess,
-        "run",
-        lambda *args, **kwargs: _completed_process(stdout=b"secret"),
+        submit_urls.file_utilities,
+        "read_encrypted_file",
+        lambda path: b"secret",
     )
     monkeypatch.setattr(
         submit_urls.requests,
