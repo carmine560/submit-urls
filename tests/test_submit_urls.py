@@ -713,7 +713,7 @@ def test_submit_urls_to_bing_posts_expected_payload(monkeypatch, capsys):
         "Content-Type": "application/json; charset=utf-8",
     }
     assert called["timeout"] == submit_urls.HTTP_TIMEOUT_SECONDS
-    assert "{'status': 'ok'}" in capsys.readouterr().out
+    assert "Bing submission succeeded for 1 URL(s)." in capsys.readouterr().out
 
 
 def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
@@ -738,7 +738,7 @@ def test_submit_urls_to_bing_raises_on_request_error(monkeypatch, capsys):
     assert "secret" not in output
 
 
-def test_submit_urls_to_bing_raises_on_invalid_json(monkeypatch, capsys):
+def test_submit_urls_to_bing_ignores_invalid_json(monkeypatch, capsys):
     class _PostResponse:
         def raise_for_status(self):
             return None
@@ -752,17 +752,15 @@ def test_submit_urls_to_bing_raises_on_invalid_json(monkeypatch, capsys):
         lambda url, data, headers, timeout: _PostResponse(),
     )
 
-    with pytest.raises(submit_urls.SubmissionError, match="Bing"):
-        submit_urls.submit_urls_to_bing(
-            "secret",
-            "https://example.com",
-            ["https://example.com/a"],
-        )
+    submit_urls.submit_urls_to_bing(
+        "secret",
+        "https://example.com",
+        ["https://example.com/a"],
+    )
 
     output = capsys.readouterr().out
-    assert "Bing submission failed" in output
-    assert "ValueError" in output
-    assert "apikey=<redacted>" in output
+    assert "Bing submission succeeded for 1 URL(s)." in output
+    assert "invalid json" not in output
     assert "secret" not in output
 
 
