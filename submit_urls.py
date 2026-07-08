@@ -317,7 +317,7 @@ def submit_urls_to_bing(api_key, site_url, url_list):
             timeout=HTTP_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        print(response.json())
+        print(f"Bing submission succeeded for {len(url_list)} URL(s).")
     except (requests.exceptions.RequestException, ValueError) as e:
         message = (
             f"Bing submission failed ({type(e).__name__}) for {redacted_url}."
