@@ -1,5 +1,5 @@
-google-api-python-client==2.197.0
-google-auth==2.50.0
-requests==2.33.1
+google-api-python-client==2.201.0
+google-auth==2.62.0
+requests==2.34.2
 xmltodict==1.0.4
-pytest==9.0.3
+pytest==9.1.1
